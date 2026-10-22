@@ -8,29 +8,37 @@ export interface AuditParams {
   action: string;
   documentType: string;
   documentId: string;
+  documentNumber?: string;
   beforeState?: Record<string, unknown> | string | null;
   afterState?: Record<string, unknown> | string | null;
+  beforeData?: any;
+  afterData?: any;
   notes?: string;
+  tx?: any;
 }
 
 export async function recordAuditLog(params: AuditParams) {
   try {
-    const beforeStr = params.beforeState
-      ? typeof params.beforeState === "string"
-        ? params.beforeState
-        : JSON.stringify(params.beforeState)
+    const client = params.tx || prisma;
+
+    const rawBefore = params.beforeState ?? params.beforeData;
+    const beforeStr = rawBefore
+      ? typeof rawBefore === "string"
+        ? rawBefore
+        : JSON.stringify(rawBefore)
       : null;
 
-    const afterStr = params.afterState
-      ? typeof params.afterState === "string"
-        ? params.afterState
-        : JSON.stringify(params.afterState)
+    const rawAfter = params.afterState ?? params.afterData;
+    const afterStr = rawAfter
+      ? typeof rawAfter === "string"
+        ? rawAfter
+        : JSON.stringify(rawAfter)
       : null;
 
     // Check if actorId exists in user table to prevent FK violations
     let validActorId: string | null = null;
     if (params.actorId) {
-      const userExists = await prisma.user.findUnique({
+      const userExists = await client.user.findUnique({
         where: { id: params.actorId },
       });
       if (userExists) {
@@ -38,7 +46,7 @@ export async function recordAuditLog(params: AuditParams) {
       }
     }
 
-    const log = await prisma.auditLog.create({
+    const log = await client.auditLog.create({
       data: {
         actorId: validActorId,
         actorName: params.actorName,
@@ -57,3 +65,5 @@ export async function recordAuditLog(params: AuditParams) {
     return null;
   }
 }
+
+export const logAudit = recordAuditLog;
