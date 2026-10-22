@@ -27,9 +27,20 @@ export async function recordAuditLog(params: AuditParams) {
         : JSON.stringify(params.afterState)
       : null;
 
+    // Check if actorId exists in user table to prevent FK violations
+    let validActorId: string | null = null;
+    if (params.actorId) {
+      const userExists = await prisma.user.findUnique({
+        where: { id: params.actorId },
+      });
+      if (userExists) {
+        validActorId = userExists.id;
+      }
+    }
+
     const log = await prisma.auditLog.create({
       data: {
-        actorId: params.actorId,
+        actorId: validActorId,
         actorName: params.actorName,
         actorRole: params.actorRole,
         action: params.action,

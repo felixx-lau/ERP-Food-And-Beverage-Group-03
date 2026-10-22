@@ -22,6 +22,7 @@ import {
   ArrowRight,
   Info
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface UserProfile {
   id: string;
@@ -31,6 +32,7 @@ interface UserProfile {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"kanban" | "list" | "form" | "activity">("kanban");
@@ -303,11 +305,14 @@ export default function HomePage() {
                   <div
                     key={app.key}
                     onClick={() => {
-                      if (hasAccess) {
-                        alert(`Membuka modul: ${app.name} (${app.destination}).`);
-                      } else {
-                        alert(`Akses Ditolak: Modul ${app.name} dibatasi untuk role: ${app.roles.join(", ")}.`);
+                      if (!hasAccess) {
+                        alert(`Akses Ditolak (SR-15): Modul ${app.name} dibatasi untuk role: ${app.roles.join(", ")}.`);
+                        return;
                       }
+                      if (app.key === "sales") router.push("/sales/orders");
+                      else if (app.key === "crm") router.push("/crm/leads");
+                      else if (app.key === "inventory") router.push("/inventory/products");
+                      else alert(`Membuka modul: ${app.name} (${app.destination}).`);
                     }}
                     className={`rounded-xl border p-4 transition-all relative flex flex-col justify-between cursor-pointer ${
                       hasAccess

@@ -98,13 +98,24 @@ export const APPS_CATALOG = [
   },
 ];
 
+import { useRouter } from "next/navigation";
+
 export default function AppSwitcherModal({
   isOpen,
   onClose,
   userRole,
   onSelectApp,
 }: AppSwitcherModalProps) {
+  const router = useRouter();
   if (!isOpen) return null;
+
+  const handleAppClick = (appKey: string) => {
+    onClose();
+    if (appKey === "sales") router.push("/sales/orders");
+    else if (appKey === "crm") router.push("/crm/leads");
+    else if (appKey === "inventory") router.push("/inventory/products");
+    else if (onSelectApp) onSelectApp(appKey);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in">
@@ -139,10 +150,7 @@ export default function AppSwitcherModal({
             return (
               <button
                 key={app.key}
-                onClick={() => {
-                  onSelectApp(app.key);
-                  onClose();
-                }}
+                onClick={() => handleAppClick(app.key)}
                 className={`group flex flex-col items-center text-center p-4 rounded-xl transition-all relative ${
                   hasAccess
                     ? "hover:bg-white/10 hover:scale-105 active:scale-95 cursor-pointer"
