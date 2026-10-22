@@ -316,6 +316,7 @@ export default function HomePage() {
                       else if (app.key === "invoicing") router.push("/accounting/invoices");
                       else if (app.key === "accounting") router.push("/accounting/journal-entries");
                       else if (app.key === "pos") router.push("/pos");
+                      else if (app.key === "dashboard") router.push("/dashboard");
                       else alert(`Membuka modul: ${app.name} (${app.destination}).`);
                     }}
                     className={`rounded-xl border p-4 transition-all relative flex flex-col justify-between cursor-pointer ${

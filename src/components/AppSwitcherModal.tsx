@@ -118,6 +118,7 @@ export default function AppSwitcherModal({
     else if (appKey === "invoicing") router.push("/accounting/invoices");
     else if (appKey === "accounting") router.push("/accounting/journal-entries");
     else if (appKey === "pos") router.push("/pos");
+    else if (appKey === "dashboard") router.push("/dashboard");
     else if (onSelectApp) onSelectApp(appKey);
   };
 
