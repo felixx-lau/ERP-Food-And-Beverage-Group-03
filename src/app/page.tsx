@@ -313,7 +313,8 @@ export default function HomePage() {
                       else if (app.key === "crm") router.push("/crm/leads");
                       else if (app.key === "inventory") router.push("/inventory/products");
                       else if (app.key === "purchase") router.push("/purchase/orders");
-                      else if (app.key === "invoicing" || app.key === "accounting") router.push("/accounting/vendor-bills");
+                      else if (app.key === "invoicing") router.push("/accounting/invoices");
+                      else if (app.key === "accounting") router.push("/accounting/journal-entries");
                       else alert(`Membuka modul: ${app.name} (${app.destination}).`);
                     }}
                     className={`rounded-xl border p-4 transition-all relative flex flex-col justify-between cursor-pointer ${

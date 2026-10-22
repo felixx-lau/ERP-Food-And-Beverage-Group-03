@@ -188,9 +188,52 @@ export async function validateDeliveryOrder(params: {
       });
     }
 
+    // 7. Create Balanced COGS Journal Entry (T-25 / Wireframe S-13 / SR-13)
+    let cogsJournal = null;
+    if (totalCogs > 0) {
+      const jeNumber = await getNextSequence("JE");
+      cogsJournal = await tx.journalEntry.create({
+        data: {
+          entryNumber: jeNumber,
+          sourceDocument: delivery.deliveryNumber,
+          documentRef: `DELIVERY_${delivery.deliveryNumber}`,
+          journalType: "INVENTORY",
+          state: "POSTED",
+          notes: `COGS recognition for Delivery ${delivery.deliveryNumber} (SO: ${delivery.salesOrder.orderNumber})`,
+          items: {
+            create: [
+              {
+                accountCode: "5010",
+                label: `COGS: ${delivery.deliveryNumber}`,
+                debit: totalCogs,
+                credit: 0,
+              },
+              {
+                accountCode: "1030",
+                label: `Inventory Relief: ${delivery.deliveryNumber}`,
+                debit: 0,
+                credit: totalCogs,
+              },
+            ],
+          },
+        },
+        include: { items: true },
+      });
+
+      await tx.account.update({
+        where: { code: "5010" },
+        data: { currentBalance: { increment: totalCogs } },
+      });
+      await tx.account.update({
+        where: { code: "1030" },
+        data: { currentBalance: { decrement: totalCogs } },
+      });
+    }
+
     return {
       updatedDelivery,
       backorderDoc,
+      cogsJournal,
       totalCogs,
       totalDeliveredValueNet,
       totalDeliveredValuePbjt: Math.round(totalDeliveredValueNet * 0.1),

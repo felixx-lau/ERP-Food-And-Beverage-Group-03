@@ -7,6 +7,7 @@ interface ResetSeedModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUserRole?: string;
+  userRole?: string;
   onSuccess: () => void;
 }
 
@@ -14,6 +15,7 @@ export default function ResetSeedModal({
   isOpen,
   onClose,
   currentUserRole,
+  userRole,
   onSuccess,
 }: ResetSeedModalProps) {
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,8 @@ export default function ResetSeedModal({
 
   if (!isOpen) return null;
 
-  const isOwner = currentUserRole === "OWNER";
+  const role = currentUserRole || userRole;
+  const isOwner = role === "OWNER";
 
   const handleConfirmReset = async () => {
     setLoading(true);

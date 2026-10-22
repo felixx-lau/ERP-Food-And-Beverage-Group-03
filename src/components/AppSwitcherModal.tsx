@@ -20,7 +20,7 @@ interface AppSwitcherModalProps {
   isOpen: boolean;
   onClose: () => void;
   userRole?: string;
-  onSelectApp: (appKey: string) => void;
+  onSelectApp?: (appKey: string) => void;
 }
 
 export const APPS_CATALOG = [
@@ -115,7 +115,8 @@ export default function AppSwitcherModal({
     else if (appKey === "crm") router.push("/crm/leads");
     else if (appKey === "inventory") router.push("/inventory/products");
     else if (appKey === "purchase") router.push("/purchase/orders");
-    else if (appKey === "invoicing" || appKey === "accounting") router.push("/accounting/vendor-bills");
+    else if (appKey === "invoicing") router.push("/accounting/invoices");
+    else if (appKey === "accounting") router.push("/accounting/journal-entries");
     else if (onSelectApp) onSelectApp(appKey);
   };
 
