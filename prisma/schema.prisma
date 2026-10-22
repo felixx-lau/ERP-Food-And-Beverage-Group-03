@@ -1,0 +1,692 @@
+// Prisma schema for PT Rasa Aruna Bersama (Rasa Aruna Kitchen) ERP
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  SALES
+  WAREHOUSE
+  PROCUREMENT
+  FINANCE
+  CASHIER
+}
+
+enum ContactType {
+  CUSTOMER
+  VENDOR
+}
+
+enum CustomerType {
+  COMPANY
+  INDIVIDUAL
+}
+
+enum PaymentTerms {
+  IMMEDIATE
+  NET7
+  NET14
+  NET30
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  CONTRA_INCOME
+  EXPENSE
+}
+
+enum LeadStage {
+  NEW
+  QUALIFIED
+  PROPOSITION
+  WON
+}
+
+enum OrderStatus {
+  DRAFT
+  WAITING_APPROVAL
+  CONFIRMED
+  DONE
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  DRAFT
+  CONFIRMED
+  DONE
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  POSTED
+  PAID
+  CANCELLED
+}
+
+enum InspectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// -------------------------------------------------------------
+// 1. Users & RBAC
+// -------------------------------------------------------------
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  role         Role
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  posSessions  PosSession[]
+  auditLogs    AuditLog[]
+}
+
+// -------------------------------------------------------------
+// 2. Contacts (Customers & Vendors)
+// -------------------------------------------------------------
+model Contact {
+  id             String         @id // e.g. C01, C02, V01
+  name           String
+  type           ContactType
+  customerType   CustomerType?
+  city           String
+  creditLimit    Float          @default(0)
+  paymentTerms   PaymentTerms   @default(IMMEDIATE)
+  openReceivable Float          @default(0) // Opening AR
+  openPayable    Float          @default(0) // Opening AP
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  defaultProducts ProductVariant[]
+  crmLeads        CrmLead[]
+  salesOrders     SalesOrder[]
+  purchaseOrders  PurchaseOrder[]
+  invoices        CustomerInvoice[]
+  vendorBills     VendorBill[]
+  customerPayments Payment[]      @relation("CustomerPayments")
+  vendorPayments   Payment[]      @relation("VendorPayments")
+  returns         ReturnRequest[]
+  creditNotes     CreditNote[]
+}
+
+// -------------------------------------------------------------
+// 3. Products & Variant SKUs
+// -------------------------------------------------------------
+model ProductVariant {
+  sku             String       @id // e.g. RICE-CHICK-S
+  name            String       // e.g. Nasi Ayam Panggang
+  size            String       // Small, Large, Regular, Single, Triple, 350 ml
+  color           String       // Original, Hot, Iced, Cokelat
+  unit            String       // box, cup, pack, bottle
+  salesPrice      Float
+  standardCost    Float
+  defaultVendorId String?
+  defaultVendor   Contact?     @relation(fields: [defaultVendorId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  stockLevels     StockLevel[]
+  stockMoves      StockMove[]
+  soLines         SalesOrderLine[]
+  poLines         PurchaseOrderLine[]
+  doLines         DeliveryOrderLine[]
+  receiptLines    GoodsReceiptLine[]
+  invoiceLines    CustomerInvoiceLine[]
+  billLines       VendorBillLine[]
+  posLines        PosOrderLine[]
+  returnLines     ReturnRequestLine[]
+  creditNoteLines CreditNoteLine[]
+  transferLines   InternalTransferLine[]
+}
+
+// -------------------------------------------------------------
+// 4. Warehouse & Stock Management
+// -------------------------------------------------------------
+model WarehouseLocation {
+  code      String       @id // WH-JKT, CAFE-JKT
+  name      String
+  type      String       @default("Internal")
+  usage     String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  stockLevels StockLevel[]
+}
+
+model StockLevel {
+  id           String            @id @default(cuid())
+  productSku   String
+  locationCode String
+  onHand       Int               @default(0)
+  reserved     Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  product      ProductVariant    @relation(fields: [productSku], references: [sku])
+  location     WarehouseLocation @relation(fields: [locationCode], references: [code])
+
+  @@unique([productSku, locationCode])
+}
+
+model StockMove {
+  id             String         @id @default(cuid())
+  moveNumber     String         @unique // SM/2026/0001
+  date           DateTime       @default(now())
+  productSku     String
+  sourceLocation String         // e.g. WH-JKT or "Vendor/Input" or "Customer/Loss"
+  destLocation   String         // e.g. CAFE-JKT or "Customer/Output"
+  quantity       Int
+  unitCost       Float
+  totalValue     Float
+  documentType   String         // SO, PO_RECEIPT, POS, TRANSFER, RETURN
+  documentRef    String         // e.g. S00007, WH/IN/0007
+  state          String         @default("DONE") // DRAFT, DONE, CANCELLED
+  createdAt      DateTime       @default(now())
+
+  product        ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 5. Accounting, CoA & General Ledger
+// -------------------------------------------------------------
+model Account {
+  code           String        @id // 1010, 1020, 1030, etc.
+  name           String
+  type           AccountType
+  openingBalance Float         @default(0)
+  currentBalance Float         @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  journalItems   JournalItem[]
+}
+
+model JournalEntry {
+  id             String        @id @default(cuid())
+  entryNumber    String        @unique // JE/2026/0001
+  date           DateTime      @default(now())
+  sourceDocument String        // e.g. WH/OUT/0007, INV/2026/0007, BILL/2026/0007, POS01
+  documentRef    String        // Unique reference for idempotency
+  journalType    String        // GENERAL, SALES, PURCHASE, BANK, CASH, INVENTORY
+  state          String        @default("POSTED") // DRAFT, POSTED, CANCELLED
+  isOpening      Boolean       @default(false)
+  notes          String?
+  createdAt      DateTime      @default(now())
+
+  items          JournalItem[]
+
+  @@index([documentRef])
+}
+
+model JournalItem {
+  id             String        @id @default(cuid())
+  journalEntryId String
+  accountCode    String
+  label          String
+  debit          Float         @default(0)
+  credit         Float         @default(0)
+  partnerId      String?
+
+  journalEntry   JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account       @relation(fields: [accountCode], references: [code])
+}
+
+// -------------------------------------------------------------
+// 6. CRM & Pipeline
+// -------------------------------------------------------------
+model CrmLead {
+  id              String        @id // LD0003
+  name            String
+  contactId       String
+  expectedRevenue Float         @default(0)
+  stage           LeadStage     @default(NEW)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  contact         Contact       @relation(fields: [contactId], references: [id])
+  salesOrders     SalesOrder[]
+}
+
+// -------------------------------------------------------------
+// 7. Sales, Quotation & Order
+// -------------------------------------------------------------
+model SalesOrder {
+  id                 String        @id @default(cuid())
+  orderNumber        String        @unique // S00006, S00007
+  contactId          String
+  leadId             String?
+  orderDate          DateTime      @default(now())
+  status             OrderStatus   @default(DRAFT)
+  pricingOption      String        @default("Exclude PBJT")
+  paymentTerms       PaymentTerms  @default(NET14)
+  discountApproved   Boolean       @default(false)
+  discountApprovedBy String?
+  discountPercent    Float         @default(0) // Order-level or max line discount
+  subtotalNet        Float         @default(0)
+  pbjtTax            Float         @default(0)
+  totalGross         Float         @default(0)
+  projectedCost      Float         @default(0)
+  isPriceLocked      Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  contact            Contact       @relation(fields: [contactId], references: [id])
+  lead               CrmLead?      @relation(fields: [leadId], references: [id])
+  lines              SalesOrderLine[]
+  deliveryOrders     DeliveryOrder[]
+  invoices           CustomerInvoice[]
+}
+
+model SalesOrderLine {
+  id              String         @id @default(cuid())
+  salesOrderId    String
+  productSku      String
+  quantity        Int
+  unitPrice       Float
+  discountPercent Float          @default(0)
+  netPrice        Float          // (unitPrice * (1 - discountPercent/100)) * quantity
+  pbjtAmount      Float          // round(netPrice * 0.1)
+  totalAmount     Float          // netPrice + pbjtAmount
+  standardCost    Float
+  deliveredQty    Int            @default(0)
+  invoicedQty     Int            @default(0)
+
+  salesOrder      SalesOrder     @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product         ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 8. Delivery Order & Backorder
+// -------------------------------------------------------------
+model DeliveryOrder {
+  id              String         @id @default(cuid())
+  deliveryNumber  String         @unique // WH/OUT/0007
+  salesOrderId    String
+  sourceLocation  String         @default("WH-JKT")
+  status          DeliveryStatus @default(DRAFT)
+  scheduledDate   DateTime       @default(now())
+  dateDone        DateTime?
+  isBackorder     Boolean        @default(false)
+  backorderOfId   String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  salesOrder      SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  lines           DeliveryOrderLine[]
+  invoices        CustomerInvoice[]
+}
+
+model DeliveryOrderLine {
+  id              String         @id @default(cuid())
+  deliveryOrderId String
+  productSku      String
+  orderedQty      Int
+  deliveredQty    Int            @default(0)
+  backorderQty    Int            @default(0)
+
+  deliveryOrder   DeliveryOrder  @relation(fields: [deliveryOrderId], references: [id], onDelete: Cascade)
+  product         ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 9. Purchasing & Vendor Receipts
+// -------------------------------------------------------------
+model PurchaseOrder {
+  id             String          @id @default(cuid())
+  poNumber       String          @unique // P00006, P00007
+  vendorId       String
+  orderDate      DateTime        @default(now())
+  scheduledDate  DateTime        @default(now())
+  status         OrderStatus     @default(DRAFT)
+  subtotal       Float           @default(0)
+  taxAmount      Float           @default(0) // 0% fixture tax
+  total          Float           @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  vendor         Contact         @relation(fields: [vendorId], references: [id])
+  lines          PurchaseOrderLine[]
+  receipts       GoodsReceipt[]
+  bills          VendorBill[]
+}
+
+model PurchaseOrderLine {
+  id              String         @id @default(cuid())
+  purchaseOrderId String
+  productSku      String
+  orderedQty      Int
+  unitPrice       Float
+  subtotal        Float
+  receivedQty     Int            @default(0)
+  billedQty       Int            @default(0)
+
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product         ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+model GoodsReceipt {
+  id            String          @id @default(cuid())
+  receiptNumber String          @unique // WH/IN/0007
+  purchaseOrderId String
+  destLocation  String          @default("WH-JKT")
+  status        DeliveryStatus  @default(DRAFT)
+  scheduledDate DateTime        @default(now())
+  dateDone      DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  purchaseOrder PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  lines         GoodsReceiptLine[]
+  bills         VendorBill[]
+}
+
+model GoodsReceiptLine {
+  id              String         @id @default(cuid())
+  receiptId       String
+  productSku      String
+  demandQty       Int
+  acceptedQty     Int            @default(0)
+  rejectedQty     Int            @default(0)
+  rejectionReason String?
+
+  receipt         GoodsReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product         ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 10. Customer Invoicing & Vendor Bills
+// -------------------------------------------------------------
+model CustomerInvoice {
+  id                String         @id @default(cuid())
+  invoiceNumber     String         @unique // INV/2026/0007
+  salesOrderId      String
+  deliveryOrderId   String?
+  customerId        String
+  invoiceDate       DateTime       @default(now())
+  dueDate           DateTime?
+  status            InvoiceStatus  @default(DRAFT)
+  subtotalNet       Float          @default(0)
+  pbjtTax           Float          @default(0)
+  totalGross        Float          @default(0)
+  paidAmount        Float          @default(0)
+  outstandingAmount Float          @default(0)
+  isPosted          Boolean        @default(false)
+  postedAt          DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  salesOrder        SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  deliveryOrder     DeliveryOrder? @relation(fields: [deliveryOrderId], references: [id])
+  customer          Contact        @relation(fields: [customerId], references: [id])
+  lines             CustomerInvoiceLine[]
+  payments          Payment[]
+  returns           ReturnRequest[]
+}
+
+model CustomerInvoiceLine {
+  id              String          @id @default(cuid())
+  invoiceId       String
+  productSku      String
+  quantity        Int
+  unitPrice       Float
+  discountPercent Float           @default(0)
+  netPrice        Float
+  pbjtAmount      Float
+  totalAmount     Float
+
+  invoice         CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product         ProductVariant  @relation(fields: [productSku], references: [sku])
+}
+
+model VendorBill {
+  id                String         @id @default(cuid())
+  billNumber        String         @unique // BILL/2026/0007
+  purchaseOrderId   String
+  receiptId         String?
+  vendorId          String
+  billDate          DateTime       @default(now())
+  dueDate           DateTime?
+  status            InvoiceStatus  @default(DRAFT)
+  subtotalNet       Float          @default(0)
+  taxAmount         Float          @default(0) // 0% fixture tax
+  totalGross        Float          @default(0)
+  paidAmount        Float          @default(0)
+  outstandingAmount Float          @default(0)
+  isPosted          Boolean        @default(false)
+  postedAt          DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  purchaseOrder     PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  receipt           GoodsReceipt?  @relation(fields: [receiptId], references: [id])
+  vendor            Contact        @relation(fields: [vendorId], references: [id])
+  lines             VendorBillLine[]
+  payments          Payment[]
+}
+
+model VendorBillLine {
+  id          String         @id @default(cuid())
+  billId      String
+  productSku  String
+  quantity    Int
+  unitPrice   Float
+  netPrice    Float
+  taxAmount   Float          @default(0)
+  totalAmount Float
+
+  bill        VendorBill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  product     ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 11. Payments
+// -------------------------------------------------------------
+model Payment {
+  id            String           @id @default(cuid())
+  paymentNumber String           @unique // PAY/2026/0001
+  paymentType   String           // CUSTOMER_INBOUND, VENDOR_OUTBOUND
+  customerId    String?
+  vendorId      String?
+  invoiceId     String?
+  billId        String?
+  paymentMethod String           @default("BANK") // BANK, CASH, QRIS
+  amount        Float
+  paymentDate   DateTime         @default(now())
+  notes         String?
+  createdAt     DateTime         @default(now())
+
+  customer      Contact?         @relation("CustomerPayments", fields: [customerId], references: [id])
+  vendor        Contact?         @relation("VendorPayments", fields: [vendorId], references: [id])
+  invoice       CustomerInvoice? @relation(fields: [invoiceId], references: [id])
+  bill          VendorBill?      @relation(fields: [billId], references: [id])
+}
+
+// -------------------------------------------------------------
+// 12. Point of Sale & Sessions
+// -------------------------------------------------------------
+model PosSession {
+  id           String        @id @default(cuid())
+  sessionCode  String        @unique // POS01, POS02
+  cashierId    String
+  locationCode String        @default("CAFE-JKT")
+  status       String        @default("OPEN") // OPEN, CLOSED
+  openedAt     DateTime      @default(now())
+  closedAt     DateTime?
+  openingCash  Float         @default(0)
+  closingCash  Float         @default(0)
+  totalSales   Float         @default(0)
+  totalOrders  Int           @default(0)
+  isClosed     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  cashier      User          @relation(fields: [cashierId], references: [id])
+  orders       PosOrder[]
+}
+
+model PosOrder {
+  id            String         @id @default(cuid())
+  orderNumber   String         @unique // POS/2026/0001
+  sessionId     String
+  locationCode  String         @default("CAFE-JKT")
+  orderDate     DateTime       @default(now())
+  tableInfo     String         @default("Takeaway")
+  status        String         @default("PAID") // PAID, CANCELLED
+  subtotalNet   Float          @default(0)
+  pbjtTax       Float          @default(0)
+  totalAmount   Float          @default(0)
+  totalCost     Float          @default(0)
+  paymentMethod String         @default("QRIS / Bank")
+  isPosted      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  session       PosSession     @relation(fields: [sessionId], references: [id])
+  lines         PosOrderLine[]
+}
+
+model PosOrderLine {
+  id           String         @id @default(cuid())
+  posOrderId   String
+  productSku   String
+  quantity     Int
+  unitPrice    Float
+  netPrice     Float
+  pbjtAmount   Float
+  totalAmount  Float
+  standardCost Float
+
+  posOrder     PosOrder       @relation(fields: [posOrderId], references: [id], onDelete: Cascade)
+  product      ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 13. Returns & Credit Notes
+// -------------------------------------------------------------
+model ReturnRequest {
+  id               String           @id @default(cuid())
+  returnNumber     String           @unique // RET/2026/0007
+  invoiceId        String
+  customerId       String
+  returnDate       DateTime         @default(now())
+  status           String           @default("DRAFT") // DRAFT, CONFIRMED, DONE, REJECTED
+  inspectionStatus InspectionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  invoice          CustomerInvoice  @relation(fields: [invoiceId], references: [id])
+  customer         Contact          @relation(fields: [customerId], references: [id])
+  lines            ReturnRequestLine[]
+  creditNotes      CreditNote[]
+}
+
+model ReturnRequestLine {
+  id              String         @id @default(cuid())
+  returnRequestId String
+  productSku      String
+  returnedQty     Int
+  acceptedQty     Int            @default(0)
+  rejectedQty     Int            @default(0)
+  inspectionNotes String?
+  unitSalesPrice  Float
+  unitStandardCost Float
+
+  returnRequest   ReturnRequest  @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  product         ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+model CreditNote {
+  id               String          @id @default(cuid())
+  creditNoteNumber String          @unique // RINV/2026/0007
+  returnRequestId  String
+  customerId       String
+  date             DateTime        @default(now())
+  status           String          @default("POSTED") // DRAFT, POSTED
+  subtotalNet      Float           @default(0)
+  pbjtTax          Float           @default(0)
+  totalGross       Float           @default(0)
+  isPosted         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+
+  returnRequest    ReturnRequest   @relation(fields: [returnRequestId], references: [id])
+  customer         Contact         @relation(fields: [customerId], references: [id])
+  lines            CreditNoteLine[]
+}
+
+model CreditNoteLine {
+  id           String         @id @default(cuid())
+  creditNoteId String
+  productSku   String
+  quantity     Int
+  unitPrice    Float
+  netPrice     Float
+  pbjtAmount   Float
+  totalAmount  Float
+  standardCost Float
+
+  creditNote   CreditNote     @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  product      ProductVariant @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 14. Internal Transfers
+// -------------------------------------------------------------
+model InternalTransfer {
+  id             String                 @id @default(cuid())
+  transferNumber String                 @unique // WH/INT/0007
+  sourceLocation String                 @default("WH-JKT")
+  destLocation   String                 @default("CAFE-JKT")
+  status         DeliveryStatus         @default(DRAFT)
+  transferDate   DateTime               @default(now())
+  isPosted       Boolean                @default(false)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  lines          InternalTransferLine[]
+}
+
+model InternalTransferLine {
+  id         String           @id @default(cuid())
+  transferId String
+  productSku String
+  quantity   Int
+  unitCost   Float
+  totalValue Float
+
+  transfer   InternalTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product    ProductVariant   @relation(fields: [productSku], references: [sku])
+}
+
+// -------------------------------------------------------------
+// 15. Audit Logs
+// -------------------------------------------------------------
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  actorName    String
+  actorRole    Role
+  action       String   // CREATE, UPDATE, CONFIRM, POST, REJECT, CLOSE_SESSION, ACCESS_DENIED, RESET_SEED
+  documentType String   // SO, PO, DO, INVOICE, BILL, POS_SESSION, GL, SEED
+  documentId   String   // S00007, GL-001, etc.
+  beforeState  String?  // JSON string
+  afterState   String?  // JSON string
+  notes        String?
+  timestamp    DateTime @default(now())
+
+  user         User?    @relation(fields: [actorId], references: [id])
+
+  @@index([documentType, documentId])
+  @@index([timestamp])
+}

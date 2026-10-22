@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Environment files
+.env*.local
+
+# Database (keep schema and migrations, ignore sqlite runtime instance if regenerated)
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Legacy archives (keep original UTS files in repo, but zip can be ignored if desired, or keep as untracked)
