@@ -1,27 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import HeaderNavbar from "@/components/HeaderNavbar";
-import AppSwitcherModal from "@/components/AppSwitcherModal";
-import ResetSeedModal from "@/components/ResetSeedModal";
-import AuditHistoryDrawer from "@/components/AuditHistoryDrawer";
-import { Users2, ArrowLeft, Play, Plus, Building, DollarSign } from "lucide-react";
+import AppLayout from "@/components/AppLayout";
+import StatusBadge from "@/components/StatusBadge";
+import KPICard from "@/components/KPICard";
+import { Users2, Play, Plus, Building, DollarSign, Check, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 const STAGES = [
-  { key: "NEW", label: "New", color: "border-t-blue-500 bg-blue-50/20" },
-  { key: "QUALIFIED", label: "Qualified", color: "border-t-amber-500 bg-amber-50/20" },
-  { key: "PROPOSITION", label: "Proposition", color: "border-t-purple-500 bg-purple-50/20" },
-  { key: "WON", label: "Won", color: "border-t-emerald-500 bg-emerald-50/20" },
+  { key: "NEW", label: "New Lead", border: "border-t-blue-500", badge: "bg-blue-50 text-blue-700 border-blue-200" },
+  { key: "QUALIFIED", label: "Qualified", border: "border-t-amber-500", badge: "bg-amber-50 text-amber-700 border-amber-200" },
+  { key: "PROPOSITION", label: "Proposition", border: "border-t-[#174A3A]", badge: "bg-[#F2F7F4] text-[#174A3A] border-[#C4DBD0]" },
+  { key: "WON", label: "Won / Deal", border: "border-t-emerald-600", badge: "bg-emerald-50 text-emerald-800 border-emerald-200" },
 ];
 
 export default function CrmLeadsPage() {
   const [user, setUser] = useState<any>(null);
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [appSwitcherOpen, setAppSwitcherOpen] = useState(false);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
 
   // Test Runner state
   const [testResult, setTestResult] = useState<any>(null);
@@ -134,194 +130,168 @@ export default function CrmLeadsPage() {
     }
   };
 
+  const totalPipeline = leads.reduce((sum, l) => sum + (l.expectedRevenue || 0), 0);
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-      <HeaderNavbar
-        currentUser={user}
-        onSwitchRole={handleSwitchRole}
-        onOpenResetModal={() => setResetModalOpen(true)}
-        onOpenAuditDrawer={() => setAuditDrawerOpen(true)}
-        onOpenAppSwitcher={() => setAppSwitcherOpen(true)}
-      />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Wireframe S-04 Header */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/"
-              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#714B67]" />
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                  CRM Pipeline Kanban
-                </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 text-purple-800">
-                  Wireframe S-04
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Modul: <strong className="text-gray-700">CRM</strong> · Roles: Sales · Fitur: <strong>F-04, SR-16</strong>
-              </p>
-            </div>
+    <AppLayout
+      currentUser={user}
+      onSwitchRole={handleSwitchRole}
+      breadcrumbs={[{ label: "Penjualan & CRM" }, { label: "CRM Leads Kanban" }]}
+      title="CRM Pipeline Kanban"
+      subtitle="Manajemen Pipeline Prospek & Peluang Penjualan Katering / Restoran (Fitur F-04, SR-16)"
+      wireframe="Wireframe S-02"
+      actions={
+        <div className="flex items-center space-x-2">
+          <div className="text-right hidden sm:block">
+            <p className="text-[10px] font-semibold text-[#758078] uppercase tracking-wider">Total Pipeline</p>
+            <p className="text-sm font-bold text-[#174A3A]">Rp {totalPipeline.toLocaleString("id-ID")}</p>
           </div>
+          <button
+            onClick={() => alert("Formulir Lead Baru (Gunakan API POST /api/crm/leads)")}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-[#174A3A] hover:bg-[#11382C] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Lead Baru</span>
+          </button>
         </div>
+      }
+    >
+      {/* 4-Stage Kanban Board */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {STAGES.map((stg) => {
+          const stageLeads = leads.filter((l) => l.stage === stg.key);
+          const stageTotal = stageLeads.reduce((sum, l) => sum + (l.expectedRevenue || 0), 0);
 
-        {/* Wireframe S-04 Section 4: Kanban Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {STAGES.map((stg) => {
-            const stageLeads = leads.filter((l) => l.stage === stg.key);
-            const stageTotal = stageLeads.reduce((sum, l) => sum + l.expectedRevenue, 0);
-
-            return (
-              <div
-                key={stg.key}
-                className={`bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col border-t-4 ${stg.color}`}
-              >
-                {/* Column Header */}
-                <div className="p-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
-                  <div>
-                    <h3 className="font-bold text-xs uppercase tracking-wide text-gray-800">
-                      {stg.label}
-                    </h3>
-                    <span className="text-[10px] text-gray-500 font-mono">
-                      Rp {stageTotal.toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                  <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-[10px]">
-                    {stageLeads.length}
+          return (
+            <div
+              key={stg.key}
+              className={`bg-white rounded-xl border border-[#E5E9E4] shadow-xs overflow-hidden flex flex-col border-t-4 ${stg.border}`}
+            >
+              {/* Column Header */}
+              <div className="p-3.5 border-b border-[#E5E9E4] flex items-center justify-between bg-[#F7F8F5]">
+                <div>
+                  <h3 className="font-bold text-xs uppercase tracking-wide text-[#202824]">
+                    {stg.label}
+                  </h3>
+                  <span className="text-[11px] text-[#758078] font-mono font-medium">
+                    Rp {stageTotal.toLocaleString("id-ID")}
                   </span>
                 </div>
-
-                {/* Cards Container */}
-                <div className="p-3 space-y-3 flex-1 overflow-y-auto max-h-[450px]">
-                  {stageLeads.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400 text-xs italic">
-                      Tidak ada lead di tahap ini.
-                    </div>
-                  ) : (
-                    stageLeads.map((lead) => (
-                      <div
-                        key={lead.id}
-                        className="bg-white border border-gray-200 hover:border-purple-300 rounded-lg p-3 shadow-2xs space-y-2 cursor-pointer transition-all hover:-translate-y-0.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-xs text-[#714B67]">
-                            {lead.id}
-                          </span>
-                          <span className="text-[11px] font-bold text-emerald-700 font-mono">
-                            Rp {lead.expectedRevenue.toLocaleString("id-ID")}
-                          </span>
-                        </div>
-
-                        <h4 className="font-bold text-xs text-gray-900 leading-snug">
-                          {lead.name}
-                        </h4>
-
-                        <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
-                          <span className="truncate max-w-[140px]">
-                            {lead.contact?.name || lead.contactId}
-                          </span>
-                          <span className="font-mono text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">
-                            {lead.contactId}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* QA Test Runner for T-07 & T-08 */}
-        <div className="bg-[#1F2937] text-white rounded-xl shadow-md p-6 border border-gray-700 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-gray-950">
-                QA Test Automation Runner
-              </span>
-              <h3 className="text-base font-bold mt-1 text-white">
-                Verifikasi Pengujian: T-07 & T-08
-              </h3>
-              <p className="text-xs text-gray-300">
-                Uji tampilan lead LD0003 dan validasi minimum data (SR-16) saat pindah tahapan.
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={runTestT07}
-                disabled={testing}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Uji T-07 (Normal LD0003)</span>
-              </button>
-
-              <button
-                onClick={runTestT08}
-                disabled={testing}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Uji T-08 (Incomplete Lead Edge Case)</span>
-              </button>
-            </div>
-          </div>
-
-          {testResult && (
-            <div className="bg-gray-950/80 border border-gray-700 rounded-lg p-4 space-y-2 text-xs animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-amber-300 font-mono text-sm">[{testResult.id}]</span>
-                  <span className="font-semibold text-white">{testResult.name}</span>
-                </div>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full font-bold font-mono text-xs ${
-                    testResult.status === "PASS" ? "bg-emerald-500 text-gray-950" : "bg-rose-500 text-white"
-                  }`}
-                >
-                  {testResult.status}
+                <span className="w-5 h-5 rounded-full bg-white border border-[#D5D8D3] text-[#202824] flex items-center justify-center font-bold text-[10px]">
+                  {stageLeads.length}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
-                <div>
-                  <span className="text-gray-400 font-semibold block">Expected Result:</span>
-                  <p className="text-gray-200 mt-0.5">{testResult.expected}</p>
-                </div>
-                <div>
-                  <span className="text-gray-400 font-semibold block">Actual Result:</span>
-                  <p className="text-emerald-300 mt-0.5 font-mono">{testResult.actual}</p>
-                </div>
+              {/* Cards Container */}
+              <div className="p-3 space-y-3 flex-1 overflow-y-auto max-h-[500px]">
+                {stageLeads.length === 0 ? (
+                  <div className="text-center py-10 text-[#758078] text-xs italic">
+                    Belum ada lead di tahap ini.
+                  </div>
+                ) : (
+                  stageLeads.map((lead) => (
+                    <div
+                      key={lead.id}
+                      className="bg-white border border-[#E5E9E4] hover:border-[#174A3A]/40 rounded-xl p-3.5 shadow-2xs space-y-2.5 cursor-pointer transition-all hover:shadow-card hover:-translate-y-0.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-xs text-[#174A3A] bg-[#F2F7F4] px-2 py-0.5 rounded border border-[#C4DBD0]">
+                          {lead.id}
+                        </span>
+                        <span className="text-xs font-bold text-emerald-700 font-mono">
+                          Rp {lead.expectedRevenue.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-xs text-[#202824] leading-snug">
+                        {lead.name}
+                      </h4>
+
+                      <div className="pt-2 border-t border-[#EEF1ED] flex items-center justify-between text-[11px] text-[#758078]">
+                        <span className="truncate max-w-[130px] font-medium text-[#525B55]">
+                          {lead.contact?.name || lead.contactId}
+                        </span>
+                        <span className="font-mono text-[10px] bg-[#F7F8F5] px-1.5 py-0.5 rounded border border-[#E5E9E4]">
+                          {lead.contactId}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-          )}
-        </div>
-      </main>
+          );
+        })}
+      </div>
 
-      <AppSwitcherModal
-        isOpen={appSwitcherOpen}
-        onClose={() => setAppSwitcherOpen(false)}
-        userRole={user?.role}
-        onSelectApp={(app) => alert(`Buka modul: ${app}`)}
-      />
-      <ResetSeedModal
-        isOpen={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-        currentUserRole={user?.role}
-        onSuccess={() => fetchLeads()}
-      />
-      <AuditHistoryDrawer
-        isOpen={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-      />
-    </div>
+      {/* QA Test Runner for T-07 & T-08 */}
+      <div className="bg-[#103429] text-white rounded-xl shadow-md p-6 border border-[#C6A15B]/30 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#C6A15B] text-[#103429]">
+                Automation Test Runner
+              </span>
+              <span className="text-xs text-[#DCE8DF] font-semibold">T-07 & T-08 Suite</span>
+            </div>
+            <h3 className="text-base font-bold mt-1 text-white">
+              Verifikasi Pengujian: Validasi Minimum Data CRM & Tahap Qualified
+            </h3>
+            <p className="text-xs text-[#DCE8DF]/80">
+              Uji tampilan lead LD0003 dan validasi minimum data (SR-16) saat berpindah tahapan.
+            </p>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              onClick={runTestT07}
+              disabled={testing}
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white flex items-center space-x-1.5 shadow-xs transition-colors disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-07 (Normal LD0003)</span>
+            </button>
+
+            <button
+              onClick={runTestT08}
+              disabled={testing}
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-rose-700 hover:bg-rose-600 text-white flex items-center space-x-1.5 shadow-xs transition-colors disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-08 (Incomplete Lead Edge Case)</span>
+            </button>
+          </div>
+        </div>
+
+        {testResult && (
+          <div className="bg-[#081B15] border border-[#C6A15B]/40 rounded-xl p-4.5 space-y-2.5 text-xs animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-[#C6A15B] font-mono text-sm">[{testResult.id}]</span>
+                <span className="font-semibold text-white">{testResult.name}</span>
+              </div>
+              <span
+                className={`px-3 py-0.5 rounded-full font-bold font-mono text-xs ${
+                  testResult.status === "PASS" ? "bg-emerald-500 text-gray-950" : "bg-rose-500 text-white"
+                }`}
+              >
+                {testResult.status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block">Ekspektasi:</span>
+                <p className="text-[#DCE8DF] leading-relaxed">{testResult.expected}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block">Hasil Aktual:</span>
+                <p className="text-emerald-300 font-mono leading-relaxed">{testResult.actual}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </AppLayout>
   );
 }

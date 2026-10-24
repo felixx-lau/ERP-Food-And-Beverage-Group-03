@@ -60,16 +60,16 @@ export default function ResetSeedModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border border-gray-200">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-[#E5E9E4]">
         {/* Modal Header */}
-        <div className="bg-rose-50 border-b border-rose-100 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-rose-800">
+        <div className="bg-rose-50/80 border-b border-rose-100 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5 text-rose-800">
             <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
             <h3 className="font-bold text-base">Konfirmasi Reset Baseline Seed</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 rounded-lg text-[#758078] hover:text-[#202824] hover:bg-white/60 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -78,40 +78,40 @@ export default function ResetSeedModal({
         {/* Modal Body */}
         <div className="p-6 space-y-4">
           {!isOwner && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-start space-x-2">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 flex items-start space-x-2.5">
               <ShieldAlert className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div>
                 <span className="font-bold">Peringatan Akses Otoritas (SR-15):</span>
-                <p>
+                <p className="mt-0.5">
                   Role aktif Anda adalah <strong>{currentUserRole}</strong>. Hanya role <strong>OWNER (Maya Prasetyo)</strong> yang diizinkan mereset database. Percobaan reset dari akun ini akan ditolak dan dicatat di Audit Log.
                 </p>
               </div>
             </div>
           )}
 
-          <p className="text-sm text-gray-700 leading-relaxed">
+          <p className="text-sm text-[#202824] leading-relaxed">
             Tindakan ini akan mengembalikan seluruh database ke kondisi <strong>Baseline Seed awal</strong> sesuai spesifikasi tugas PDF:
           </p>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs space-y-1.5 font-mono text-gray-700">
+          <div className="bg-[#F7F8F5] border border-[#E5E9E4] rounded-xl p-3.5 text-xs space-y-1.5 font-mono text-[#202824]">
             <div className="flex justify-between">
-              <span>• Total Persediaan:</span>
-              <span className="font-bold">616 Unit (WH: 410, CAFE: 206)</span>
+              <span className="text-[#758078]">• Total Persediaan:</span>
+              <span className="font-bold text-[#174A3A]">616 Unit (WH: 410, CAFE: 206)</span>
             </div>
             <div className="flex justify-between">
-              <span>• Valuasi Persediaan:</span>
-              <span className="font-bold">Rp 12.214.000</span>
+              <span className="text-[#758078]">• Valuasi Persediaan:</span>
+              <span className="font-bold text-[#174A3A]">Rp 12.214.000</span>
             </div>
             <div className="flex justify-between">
-              <span>• Saldo Bank Awal:</span>
+              <span className="text-[#758078]">• Saldo Bank Awal:</span>
               <span className="font-bold">Rp 20.000.000</span>
             </div>
             <div className="flex justify-between">
-              <span>• Jurnal Pembuka Seimbang:</span>
+              <span className="text-[#758078]">• Jurnal Pembuka Seimbang:</span>
               <span className="font-bold text-emerald-700">Dr = Cr = Rp 33.714.000</span>
             </div>
             <div className="flex justify-between">
-              <span>• Dokumen Bawaan:</span>
+              <span className="text-[#758078]">• Dokumen Bawaan:</span>
               <span className="font-bold">LD0003, S00006 (Res 6), P00006</span>
             </div>
           </div>
@@ -135,20 +135,20 @@ export default function ResetSeedModal({
         </div>
 
         {/* Modal Actions */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+        <div className="bg-[#F7F8F5] px-6 py-4 border-t border-[#E5E9E4] flex justify-end space-x-3">
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+            className="px-4 py-2 text-xs font-semibold text-[#525B55] bg-white border border-[#D5D8D3] rounded-lg hover:bg-[#F7F8F5] transition-colors"
           >
             Batal
           </button>
           <button
             onClick={handleConfirmReset}
             disabled={loading || !isOwner}
-            className={`px-4 py-2 text-xs font-bold text-white rounded-lg flex items-center space-x-1.5 shadow-sm transition-all ${
+            className={`px-4 py-2 text-xs font-bold text-white rounded-lg flex items-center space-x-1.5 shadow-xs transition-all ${
               isOwner
-                ? "bg-rose-700 hover:bg-rose-800 active:scale-95"
+                ? "bg-rose-600 hover:bg-rose-700 active:scale-95"
                 : "bg-gray-400 cursor-not-allowed"
             }`}
           >

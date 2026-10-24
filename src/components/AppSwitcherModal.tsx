@@ -123,31 +123,35 @@ export default function AppSwitcherModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in">
-      <div className="bg-[#2B2D42]/95 border border-purple-500/30 w-full max-w-4xl rounded-2xl p-8 shadow-2xl text-white relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="bg-[#103429] border border-[#C6A15B]/30 w-full max-w-4xl rounded-2xl p-8 shadow-2xl text-white relative">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
+          className="absolute top-5 right-5 p-2 rounded-full hover:bg-white/10 text-[#DCE8DF] hover:text-white transition-colors"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
 
         {/* Modal Title */}
         <div className="text-center mb-8">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-[#DCE8DF] mb-2 border border-white/10">
+            <span className="w-2 h-2 rounded-full bg-[#C6A15B]" />
+            <span>PT Rasa Aruna Bersama — Rasa Aruna Kitchen</span>
+          </div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center space-x-2">
             <span>Rasa Aruna Apps Hub</span>
           </h2>
-          <p className="text-xs text-purple-200 mt-1">
-            Navigasi aplikasi terintegrasi Odoo Web 17.0 · Role Aktif:{" "}
-            <span className="font-bold text-amber-300 uppercase px-2 py-0.5 rounded bg-black/40">
+          <p className="text-xs text-[#DCE8DF]/80 mt-1">
+            Navigasi modul ERP terintegrasi · Role Aktif:{" "}
+            <span className="font-bold text-[#C6A15B] uppercase px-2 py-0.5 rounded bg-black/40 border border-white/10">
               {userRole || "GUEST"}
             </span>
           </p>
         </div>
 
         {/* Apps Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
           {APPS_CATALOG.map((app) => {
             const hasAccess = userRole ? app.roles.includes(userRole) : false;
             const IconComponent = app.icon;
@@ -156,31 +160,31 @@ export default function AppSwitcherModal({
               <button
                 key={app.key}
                 onClick={() => handleAppClick(app.key)}
-                className={`group flex flex-col items-center text-center p-4 rounded-xl transition-all relative ${
+                className={`group flex flex-col items-center text-center p-4 rounded-xl border border-white/5 transition-all relative ${
                   hasAccess
-                    ? "hover:bg-white/10 hover:scale-105 active:scale-95 cursor-pointer"
-                    : "opacity-45 hover:opacity-60 cursor-pointer"
+                    ? "bg-white/5 hover:bg-white/10 hover:border-[#C6A15B]/40 hover:scale-[1.02] active:scale-95 cursor-pointer shadow-sm"
+                    : "opacity-40 hover:opacity-55 cursor-pointer bg-black/20"
                 }`}
               >
                 <div
-                  className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg mb-3 ${app.color} transition-transform group-hover:rotate-1`}
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md mb-3 ${app.color} transition-transform group-hover:scale-105`}
                 >
-                  <IconComponent className="w-8 h-8 text-white" />
+                  <IconComponent className="w-7 h-7 text-white" />
                 </div>
 
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1.5">
                   <span className="font-bold text-sm tracking-wide text-white">
                     {app.name}
                   </span>
-                  {!hasAccess && <Lock className="w-3.5 h-3.5 text-amber-400" />}
+                  {!hasAccess && <Lock className="w-3.5 h-3.5 text-[#C6A15B]" />}
                 </div>
 
-                <span className="text-[10px] text-gray-300 mt-1 line-clamp-2">
+                <span className="text-[11px] text-[#DCE8DF]/80 mt-1 line-clamp-2 leading-relaxed">
                   {app.destination}
                 </span>
 
                 {!hasAccess && (
-                  <span className="mt-1 text-[9px] px-1.5 py-0.2 rounded bg-rose-900/80 text-rose-200 border border-rose-700/50">
+                  <span className="mt-2 text-[9px] font-semibold px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800/50">
                     Restricted
                   </span>
                 )}

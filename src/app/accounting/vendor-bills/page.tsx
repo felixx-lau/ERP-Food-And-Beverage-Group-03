@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import HeaderNavbar from "@/components/HeaderNavbar";
-import AppSwitcherModal from "@/components/AppSwitcherModal";
-import ResetSeedModal from "@/components/ResetSeedModal";
-import AuditHistoryDrawer from "@/components/AuditHistoryDrawer";
-import { ArrowLeft, Play, Receipt, CheckCircle2, Lock, FileSpreadsheet, ShieldAlert } from "lucide-react";
+import AppLayout from "@/components/AppLayout";
+import StatusBadge from "@/components/StatusBadge";
+import KPICard from "@/components/KPICard";
+import { Play, Receipt, CheckCircle2, Lock, FileSpreadsheet, ShieldAlert, FileText, Check } from "lucide-react";
 import Link from "next/link";
 
 export default function VendorBillsPage() {
@@ -13,9 +12,6 @@ export default function VendorBillsPage() {
   const [bills, setBills] = useState<any[]>([]);
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [appSwitcherOpen, setAppSwitcherOpen] = useState(false);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
 
   // Test Runner state
   const [testResult, setTestResult] = useState<any>(null);
@@ -80,7 +76,6 @@ export default function VendorBillsPage() {
     try {
       await handleSwitchRole("FINANCE");
 
-      // Find PO with done receipt (e.g. from T-17)
       const resReceipts = await fetch("/api/inventory/receipts");
       const dataReceipts = await resReceipts.json();
       const doneReceipt = dataReceipts.receipts.find((r: any) => r.status === "DONE");
@@ -90,7 +85,6 @@ export default function VendorBillsPage() {
         return;
       }
 
-      // Create bill for 8 units
       const resBill = await fetch("/api/accounting/vendor-bills", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,7 +96,6 @@ export default function VendorBillsPage() {
       });
       const dataBill = await resBill.json();
 
-      // Post bill
       const resPost = await fetch(`/api/accounting/vendor-bills/${dataBill.bill.id}/post`, { method: "POST" });
       const dataPost = await resPost.json();
 
@@ -138,11 +131,9 @@ export default function VendorBillsPage() {
 
       await handleSwitchRole("FINANCE");
 
-      // 1. Post ulang bill yang sama -> expect idempotent
       const resRetry = await fetch(`/api/accounting/vendor-bills/${selectedBill.id}/post`, { method: "POST" });
       const dataRetry = await resRetry.json();
 
-      // 2. Coba buat bill kedua untuk unit yang sama
       const resDup = await fetch("/api/accounting/vendor-bills", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -168,262 +159,231 @@ export default function VendorBillsPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-      <HeaderNavbar
-        currentUser={user}
-        onSwitchRole={handleSwitchRole}
-        onOpenResetModal={() => setResetModalOpen(true)}
-        onOpenAuditDrawer={() => setAuditDrawerOpen(true)}
-        onOpenAppSwitcher={() => setAppSwitcherOpen(true)}
-      />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Wireframe S-11 Header */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/"
-              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#714B67]" />
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                  Vendor Bill dan Three-Way Match
-                </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 text-purple-800">
-                  Wireframe S-11
-                </span>
+    <AppLayout
+      currentUser={user}
+      onSwitchRole={handleSwitchRole}
+      breadcrumbs={[{ label: "Keuangan & Akuntansi" }, { label: "Vendor Bills (3-Way)" }]}
+      title="Vendor Bills & Three-Way Matching"
+      subtitle="Verifikasi Tagihan Pemasok Melalui Pencocokan 3 Arah (PO vs GR vs Bill) & Kliring Akun GRNI (F-13, SR-06, SR-13)"
+      wireframe="Wireframe S-11"
+      actions={
+        <div className="flex items-center space-x-2">
+          <span className="text-xs font-semibold text-[#758078] hidden sm:inline">Pilih Tagihan Vendor:</span>
+          <select
+            value={selectedBill?.id || ""}
+            onChange={(e) => fetchBillDetail(e.target.value)}
+            className="text-xs font-mono font-bold bg-white border border-[#E5E9E4] text-[#202824] rounded-lg px-3 py-1.5 shadow-2xs focus:ring-1 focus:ring-[#174A3A]"
+          >
+            {bills.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.billNumber} — {b.vendor?.name} ({b.status})
+              </option>
+            ))}
+          </select>
+        </div>
+      }
+    >
+      {/* Selected Bill Detail */}
+      {selectedBill && (
+        <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] overflow-hidden">
+          {/* Status Bar */}
+          <div className="bg-[#F7F8F5] px-6 py-3 border-b border-[#E5E9E4] flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <span className="text-xs font-bold text-[#758078] uppercase tracking-wider">Status Tagihan:</span>
+              <div className="inline-flex rounded-lg shadow-2xs overflow-hidden border border-[#E5E9E4]">
+                {["DRAFT", "CONFIRMED", "DONE"].map((st) => {
+                  const active = (selectedBill.status === "POSTED" && st === "DONE") || selectedBill.status === st;
+                  return (
+                    <span
+                      key={st}
+                      className={`px-3 py-1 text-xs font-bold font-mono transition-colors ${
+                        active
+                          ? "bg-[#174A3A] text-white"
+                          : "bg-white text-[#758078]"
+                      }`}
+                    >
+                      {st}
+                    </span>
+                  );
+                })}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Modul: <strong className="text-gray-700">Accounting / Vendors</strong> · Roles: Finance · Fitur: <strong>F-13, SR-06</strong>
+            </div>
+
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="text-[#758078]">Pencocokan:</span>
+              <span className="font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Three-Way Match Terverifikasi
+              </span>
+            </div>
+          </div>
+
+          {/* Document Header */}
+          <div className="p-6 border-b border-[#E5E9E4] grid grid-cols-1 sm:grid-cols-4 gap-6 bg-[#F7F8F5]/40">
+            <div>
+              <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider block">
+                Nomor Vendor Bill
+              </span>
+              <h2 className="text-2xl font-black text-[#174A3A] font-mono mt-0.5">
+                {selectedBill.billNumber}
+              </h2>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider block">
+                Pemasok / Vendor
+              </span>
+              <p className="text-base font-bold text-[#202824] mt-0.5">
+                {selectedBill.vendor?.name}
+              </p>
+              <span className="text-xs text-[#758078] font-mono">
+                ID: {selectedBill.vendorId}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider block">
+                Referensi Purchase Order
+              </span>
+              <p className="text-sm font-bold text-[#174A3A] font-mono mt-0.5">
+                {selectedBill.purchaseOrder?.poNumber}
+              </p>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider block">
+                Pajak Vendor
+              </span>
+              <p className="text-sm font-bold text-emerald-700 mt-0.5">
+                0% (Fixture)
               </p>
             </div>
           </div>
 
-          {/* Bill Selector */}
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-gray-600">Pilih Tagihan:</span>
-            <select
-              value={selectedBill?.id || ""}
-              onChange={(e) => fetchBillDetail(e.target.value)}
-              className="text-xs font-mono font-bold bg-white border border-gray-300 rounded-lg px-3 py-1.5 shadow-2xs focus:ring-1 focus:ring-purple-600"
+          {/* Lines Table */}
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#202824] uppercase tracking-wide flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-[#174A3A]" />
+                <span>Pencocokan Tiga Arah: PO vs Receipt (Accepted) vs Tagihan Baru</span>
+              </h3>
+              <span className="text-xs text-[#758078]">Mencegah penagihan berlebih atau barang ditolak</span>
+            </div>
+
+            <div className="overflow-x-auto border border-[#E5E9E4] rounded-xl shadow-2xs">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F7F8F5] font-semibold text-[#758078] uppercase tracking-wider text-[11px] border-b border-[#E5E9E4]">
+                  <tr>
+                    <th className="px-6 py-3.5">SKU Varian & Nama Produk</th>
+                    <th className="px-6 py-3.5 text-right">Dipesan (PO)</th>
+                    <th className="px-6 py-3.5 text-right text-emerald-800">Diterima (Receipt)</th>
+                    <th className="px-6 py-3.5 text-right text-[#758078]">Sudah Ditagih</th>
+                    <th className="px-6 py-3.5 text-right text-[#174A3A] font-bold">Qty Tagihan Ini</th>
+                    <th className="px-6 py-3.5 text-right">Net Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E5E9E4] font-mono">
+                  {selectedBill.lines?.map((l: any) => (
+                    <tr key={l.id} className="hover:bg-[#F7F8F5] transition-colors">
+                      <td className="px-6 py-3.5 font-bold text-[#202824] font-sans">
+                        <span className="font-mono text-[#174A3A] mr-2">{l.productSku}</span>
+                        <span>{l.product?.name}</span>
+                      </td>
+                      <td className="px-6 py-3.5 text-right font-bold text-[#202824]">10</td>
+                      <td className="px-6 py-3.5 text-right font-black text-emerald-700 bg-emerald-50/40">8</td>
+                      <td className="px-6 py-3.5 text-right text-[#758078]">0</td>
+                      <td className="px-6 py-3.5 text-right font-black text-[#174A3A] bg-[#F2F7F4]">
+                        {l.quantity}
+                      </td>
+                      <td className="px-6 py-3.5 text-right font-bold text-[#202824]">
+                        Rp {l.totalAmount.toLocaleString("id-ID")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-[#F7F8F5] font-mono text-xs border-t-2 border-[#E5E9E4]">
+                  <tr>
+                    <td colSpan={5} className="px-6 py-3.5 text-right font-sans font-bold text-[#758078]">
+                      Total Kewajiban Tagihan Vendor:
+                    </td>
+                    <td className="px-6 py-3.5 text-right font-black text-base text-[#174A3A]">
+                      Rp {selectedBill.totalGross?.toLocaleString("id-ID")}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QA Test Runner for T-21 & T-22 */}
+      <div className="bg-[#103429] text-white rounded-xl shadow-md p-6 border border-[#C6A15B]/30 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#C6A15B] text-[#103429]">
+                Automation Test Runner
+              </span>
+              <span className="text-xs text-[#DCE8DF] font-semibold">T-21 & T-22 Suite</span>
+            </div>
+            <h3 className="text-base font-bold mt-1 text-white">
+              Verifikasi Pengujian: Three-Way Match, Kliring GRNI & Proteksi Tagihan Duplikat
+            </h3>
+            <p className="text-xs text-[#DCE8DF]/80">
+              Uji pencocokan Three-Way Match, posting Vendor Bill (Dr GRNI = Cr AP), dan blokir tagihan duplikat (SR-13).
+            </p>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              onClick={runTestT21}
+              disabled={testing}
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white flex items-center space-x-1.5 shadow-xs transition-colors disabled:opacity-50"
             >
-              {bills.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.billNumber} — {b.vendor?.name} ({b.status})
-                </option>
-              ))}
-            </select>
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-21 (Vendor Bill 8 Accepted)</span>
+            </button>
+
+            <button
+              onClick={runTestT22}
+              disabled={testing}
+              className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#C6A15B] hover:bg-[#A88544] text-[#103429] font-bold flex items-center space-x-1.5 shadow-xs transition-colors disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-22 (Duplicate Bill Prevention)</span>
+            </button>
           </div>
         </div>
 
-        {/* Selected Bill Detail */}
-        {selectedBill && (
-          <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
-            {/* Status Bar */}
-            <div className="bg-gray-100 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
+        {testResult && (
+          <div className="bg-[#081B15] border border-[#C6A15B]/40 rounded-xl p-4.5 space-y-2.5 text-xs animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Status:</span>
-                <div className="inline-flex rounded-md shadow-2xs">
-                  {["DRAFT", "CONFIRMED", "DONE"].map((st) => {
-                    const active = (selectedBill.status === "POSTED" && st === "DONE") || selectedBill.status === st;
-                    return (
-                      <span
-                        key={st}
-                        className={`px-3 py-1 text-xs font-bold font-mono ${
-                          active
-                            ? "bg-[#714B67] text-white"
-                            : "bg-white text-gray-400"
-                        } border border-gray-300 first:rounded-l-md last:rounded-r-md`}
-                      >
-                        {st}
-                      </span>
-                    );
-                  })}
-                </div>
+                <span className="font-bold text-[#C6A15B] font-mono text-sm">[{testResult.id}]</span>
+                <span className="font-semibold text-white">{testResult.name}</span>
               </div>
+              <span
+                className={`px-3 py-0.5 rounded-full font-bold font-mono text-xs ${
+                  testResult.status === "PASS" ? "bg-emerald-500 text-gray-950" : "bg-rose-500 text-white"
+                }`}
+              >
+                {testResult.status}
+              </span>
             </div>
 
-            {/* Document Header */}
-            <div className="p-6 border-b border-gray-200 grid grid-cols-1 sm:grid-cols-4 gap-6 bg-gray-50/40">
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
-                  Bill Number
-                </span>
-                <h2 className="text-2xl font-black text-[#714B67] font-mono mt-0.5">
-                  {selectedBill.billNumber}
-                </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block">Ekspektasi:</span>
+                <p className="text-[#DCE8DF] leading-relaxed">{testResult.expected}</p>
               </div>
-
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
-                  Vendor
-                </span>
-                <p className="text-base font-bold text-gray-900 mt-0.5">
-                  {selectedBill.vendor?.name}
-                </p>
-                <span className="text-xs text-gray-500 font-mono">
-                  ID: {selectedBill.vendorId}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
-                  Purchase Order
-                </span>
-                <p className="text-sm font-bold text-gray-900 font-mono mt-0.5">
-                  {selectedBill.purchaseOrder?.poNumber}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
-                  Vendor Tax
-                </span>
-                <p className="text-sm font-bold text-emerald-700 mt-0.5">
-                  0% (Fixture)
-                </p>
-              </div>
-            </div>
-
-            {/* Wireframe S-11 Section 4: Mencocokkan PO, Receipt, Bill */}
-            <div className="p-6 space-y-4">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">
-                ④ Mencocokkan PO, Receipt, Bill (Three-Way Match)
-              </h3>
-
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 font-semibold text-gray-600 uppercase tracking-wider text-[11px] border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3">Variant SKU</th>
-                      <th className="px-6 py-3 text-right">Ordered</th>
-                      <th className="px-6 py-3 text-right text-emerald-800">Accepted</th>
-                      <th className="px-6 py-3 text-right text-gray-500">Already Billed</th>
-                      <th className="px-6 py-3 text-right text-[#714B67] font-bold">New Bill Qty</th>
-                      <th className="px-6 py-3 text-right">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 font-mono">
-                    {selectedBill.lines?.map((l: any) => (
-                      <tr key={l.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-3.5 font-bold text-gray-900 font-sans">
-                          {l.productSku} — {l.product?.name}
-                        </td>
-                        <td className="px-6 py-3.5 text-right font-bold">10</td>
-                        <td className="px-6 py-3.5 text-right font-black text-emerald-700 bg-emerald-50/40">8</td>
-                        <td className="px-6 py-3.5 text-right text-gray-500">0</td>
-                        <td className="px-6 py-3.5 text-right font-black text-[#714B67] bg-purple-50/40">
-                          {l.quantity}
-                        </td>
-                        <td className="px-6 py-3.5 text-right font-bold text-gray-900">
-                          Rp {l.totalAmount.toLocaleString("id-ID")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50 font-mono text-xs border-t-2 border-gray-300">
-                    <tr>
-                      <td colSpan={5} className="px-6 py-3 text-right font-sans font-bold text-gray-700">
-                        Total Vendor Bill:
-                      </td>
-                      <td className="px-6 py-3 text-right font-black text-base text-[#714B67]">
-                        Rp {selectedBill.totalGross?.toLocaleString("id-ID")}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block">Hasil Aktual:</span>
+                <p className="text-emerald-300 font-mono leading-relaxed">{testResult.actual}</p>
               </div>
             </div>
           </div>
         )}
-
-        {/* QA Test Runner for T-21 & T-22 */}
-        <div className="bg-[#1F2937] text-white rounded-xl shadow-md p-6 border border-gray-700 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-gray-950">
-                QA Test Automation Runner
-              </span>
-              <h3 className="text-base font-bold mt-1 text-white">
-                Verifikasi Pengujian: T-21 & T-22
-              </h3>
-              <p className="text-xs text-gray-300">
-                Uji pencocokan Three-Way Match, posting Vendor Bill (Dr GRNI = Cr AP), dan blokir tagihan duplikat (SR-13).
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={runTestT21}
-                disabled={testing}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Uji T-21 (Vendor Bill 8 Accepted)</span>
-              </button>
-
-              <button
-                onClick={runTestT22}
-                disabled={testing}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-500 text-white flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Uji T-22 (Duplicate Bill Prevention)</span>
-              </button>
-            </div>
-          </div>
-
-          {testResult && (
-            <div className="bg-gray-950/80 border border-gray-700 rounded-lg p-4 space-y-2 text-xs animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-amber-300 font-mono text-sm">[{testResult.id}]</span>
-                  <span className="font-semibold text-white">{testResult.name}</span>
-                </div>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full font-bold font-mono text-xs ${
-                    testResult.status === "PASS" ? "bg-emerald-500 text-gray-950" : "bg-rose-500 text-white"
-                  }`}
-                >
-                  {testResult.status}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
-                <div>
-                  <span className="text-gray-400 font-semibold block">Expected Result:</span>
-                  <p className="text-gray-200 mt-0.5">{testResult.expected}</p>
-                </div>
-                <div>
-                  <span className="text-gray-400 font-semibold block">Actual Result:</span>
-                  <p className="text-emerald-300 mt-0.5 font-mono">{testResult.actual}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
-
-      <AppSwitcherModal
-        isOpen={appSwitcherOpen}
-        onClose={() => setAppSwitcherOpen(false)}
-        userRole={user?.role}
-        onSelectApp={(app) => alert(`Buka modul: ${app}`)}
-      />
-      <ResetSeedModal
-        isOpen={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-        currentUserRole={user?.role}
-        onSuccess={() => fetchBills()}
-      />
-      <AuditHistoryDrawer
-        isOpen={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-      />
-    </div>
+      </div>
+    </AppLayout>
   );
 }

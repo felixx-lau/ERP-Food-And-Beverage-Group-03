@@ -1,26 +1,26 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import HeaderNavbar from "@/components/HeaderNavbar";
-import AppSwitcherModal, { APPS_CATALOG } from "@/components/AppSwitcherModal";
-import ResetSeedModal from "@/components/ResetSeedModal";
-import AuditHistoryDrawer from "@/components/AuditHistoryDrawer";
+import AppLayout from "@/components/AppLayout";
+import { APPS_CATALOG } from "@/components/AppSwitcherModal";
+import StatusBadge from "@/components/StatusBadge";
+import KPICard from "@/components/KPICard";
 import { 
   Building2, 
   MapPin, 
   ShieldCheck, 
   Lock, 
   CheckCircle2, 
-  AlertCircle, 
   ExternalLink,
-  Layers, 
-  ListFilter, 
-  Search, 
   Play, 
   Clock, 
-  Database,
   ArrowRight,
-  Info
+  Sparkles,
+  LayoutGrid,
+  List,
+  Layers,
+  ChevronRight,
+  ShieldAlert
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -35,10 +35,7 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"kanban" | "list" | "form" | "activity">("kanban");
-  const [appSwitcherOpen, setAppSwitcherOpen] = useState(false);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"kanban" | "list">("kanban");
 
   // Test Runner State for T-01 and T-02
   const [testResult, setTestResult] = useState<{
@@ -59,7 +56,6 @@ export default function HomePage() {
         const data = await res.json();
         setUser(data.user);
       } else {
-        // Automatically login/switch to OWNER as initial default
         await handleSwitchRole("OWNER");
       }
     } catch {
@@ -103,7 +99,7 @@ export default function HomePage() {
       status: visiblePoints.length === 8 ? "PASS" : "FAIL",
       expected: "Tampil delapan titik navigasi (Sales, CRM, Purchase, Inventory, Accounting, Invoicing, Point of Sale, Dashboard) dan identitas PT Rasa Aruna Bersama.",
       actual: `Berhasil login sebagai Owner (Maya Prasetyo). Terdeteksi ${visiblePoints.length} titik navigasi aktif: ${visiblePoints.map(p => p.name).join(", ")}. Identitas perusahaan: PT Rasa Aruna Bersama, Lokasi Default: WH-JKT.`,
-      auditLogRef: "Event LOGIN / SWITCH_ROLE terekam.",
+      auditLogRef: "Event LOGIN / SWITCH_ROLE terekam di Audit Trail.",
     });
     setTesting(false);
   };
@@ -152,412 +148,342 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-      {/* Top Navbar */}
-      <HeaderNavbar
-        currentUser={user}
-        onSwitchRole={handleSwitchRole}
-        onOpenResetModal={() => setResetModalOpen(true)}
-        onOpenAuditDrawer={() => setAuditDrawerOpen(true)}
-        onOpenAppSwitcher={() => setAppSwitcherOpen(true)}
-      />
+    <AppLayout
+      currentUser={user}
+      onSwitchRole={handleSwitchRole}
+      breadcrumbs={[{ label: "Core" }, { label: "Beranda & Apps" }]}
+      title="Beranda & Apps Launcher"
+      subtitle="Sistem ERP Terintegrasi PT Rasa Aruna Bersama — Odoo 17 & SAP Fiori Experience"
+      wireframe="Wireframe S-01"
+      actions={
+        <div className="flex items-center space-x-1.5 bg-[#F7F8F5] p-1 rounded-lg border border-[#E5E9E4]">
+          <button
+            onClick={() => setActiveTab("kanban")}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              activeTab === "kanban"
+                ? "bg-white text-[#174A3A] shadow-xs font-bold"
+                : "text-[#758078] hover:text-[#202824]"
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Kanban Grid</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("list")}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              activeTab === "list"
+                ? "bg-white text-[#174A3A] shadow-xs font-bold"
+                : "text-[#758078] hover:text-[#202824]"
+            }`}
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Matriks List</span>
+          </button>
+        </div>
+      }
+    >
+      {/* 3 Identity KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-5 flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-xl bg-[#F2F7F4] border border-[#C4DBD0] flex items-center justify-center text-[#174A3A] flex-shrink-0">
+            <Building2 className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider">
+              Identitas Perusahaan
+            </span>
+            <h3 className="text-base font-bold text-[#202824] truncate">PT Rasa Aruna Bersama</h3>
+            <p className="text-xs text-[#758078] truncate">Brand: Rasa Aruna Kitchen (F&B Jakarta)</p>
+          </div>
+        </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        
-        {/* Wireframe S-01 Section 1: Title & Control Panel */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#714B67]" />
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                Beranda dan App Switcher
-              </h1>
-              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 text-purple-800">
-                Wireframe S-01
+        <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-5 flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 flex-shrink-0">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider">
+              Pengguna & Role Aktif
+            </span>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-[#202824] truncate">
+                {user?.name || "Memuat..."}
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] uppercase font-bold bg-[#174A3A] text-white">
+                {user?.role || "GUEST"}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Modul: <strong className="text-gray-700">Core / Home</strong> · Roles: Owner, Sales, Warehouse, Procurement, Finance, Cashier · Fitur: <strong>F-01, F-21</strong>
+            <p className="text-xs text-[#758078] font-mono truncate">{user?.email}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-5 flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-xl bg-[#FAF5EB] border border-[#F4E7CE] flex items-center justify-center text-[#C6A15B] flex-shrink-0">
+            <MapPin className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-[#758078] uppercase tracking-wider">
+              Lokasi Standar & Operasional
+            </span>
+            <h3 className="text-base font-bold text-[#202824] truncate">WH-JKT (Gudang Pusat)</h3>
+            <p className="text-xs text-[#758078] truncate">Gerai POS: CAFE-JKT (Kopi & Pastry)</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Akses Modul Berdasarkan Role */}
+      <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] overflow-hidden">
+        <div className="px-6 py-4 bg-[#F7F8F5] border-b border-[#E5E9E4] flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-[#202824] tracking-wide uppercase flex items-center space-x-2">
+              <span>Akses Modul Berdasarkan Role (SR-15)</span>
+              <span className="text-[11px] font-normal text-[#758078] lowercase tracking-normal">
+                (8 aplikasi utama)
+              </span>
+            </h2>
+            <p className="text-xs text-[#758078] mt-0.5">
+              Pintasan aplikasi dan matriks wewenang hak akses untuk role <strong>{user?.role || "GUEST"}</strong>.
+            </p>
+          </div>
+          <div className="text-xs text-[#758078]">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E1EDE6] text-[#174A3A] font-semibold text-[11px]">
+              Odoo 17 Web Standard
+            </span>
+          </div>
+        </div>
+
+        {activeTab === "kanban" ? (
+          /* Kanban Mode */
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {APPS_CATALOG.map((app) => {
+              const hasAccess = user ? app.roles.includes(user.role) : false;
+              const IconComponent = app.icon;
+
+              return (
+                <div
+                  key={app.key}
+                  onClick={() => {
+                    if (!hasAccess) {
+                      alert(`Akses Ditolak (SR-15): Modul ${app.name} dibatasi untuk role: ${app.roles.join(", ")}.`);
+                      return;
+                    }
+                    if (app.key === "sales") router.push("/sales/orders");
+                    else if (app.key === "crm") router.push("/crm/leads");
+                    else if (app.key === "inventory") router.push("/inventory/products");
+                    else if (app.key === "purchase") router.push("/purchase/orders");
+                    else if (app.key === "invoicing") router.push("/accounting/invoices");
+                    else if (app.key === "accounting") router.push("/accounting/journal-entries");
+                    else if (app.key === "pos") router.push("/pos");
+                    else if (app.key === "dashboard") router.push("/dashboard");
+                    else alert(`Membuka modul: ${app.name} (${app.destination}).`);
+                  }}
+                  className={`rounded-xl border p-4.5 transition-all relative flex flex-col justify-between cursor-pointer ${
+                    hasAccess
+                      ? "bg-white border-[#E5E9E4] hover:border-[#174A3A]/40 hover:shadow-card hover:-translate-y-0.5"
+                      : "bg-[#F7F8F5] border-dashed border-[#D5D8D3] opacity-60"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3.5">
+                      <div
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center text-white ${app.color} shadow-xs`}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      {hasAccess ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center space-x-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Authorized</span>
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center space-x-1">
+                          <Lock className="w-3 h-3" />
+                          <span>Restricted</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <h4 className="font-bold text-sm text-[#202824]">{app.name}</h4>
+                    <p className="text-xs text-[#758078] mt-1 leading-relaxed line-clamp-2">
+                      {app.desc}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-[#EEF1ED] flex items-center justify-between text-[11px]">
+                    <span className="text-[#758078] font-medium">Tujuan:</span>
+                    <span className="font-semibold text-[#174A3A] flex items-center space-x-1">
+                      <span>{app.destination}</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* List View Mode */
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-[#202824]">
+              <thead className="bg-[#F7F8F5] text-[#758078] font-semibold uppercase tracking-wider text-[11px] border-b border-[#E5E9E4]">
+                <tr>
+                  <th className="px-6 py-3.5">Aplikasi</th>
+                  <th className="px-6 py-3.5">Tujuan & Halaman</th>
+                  <th className="px-6 py-3.5">Wewenang Role</th>
+                  <th className="px-6 py-3.5">Status Akses Role Ini</th>
+                  <th className="px-6 py-3.5 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E9E4]">
+                {APPS_CATALOG.map((app) => {
+                  const hasAccess = user ? app.roles.includes(user.role) : false;
+                  return (
+                    <tr key={app.key} className="hover:bg-[#F7F8F5] transition-colors">
+                      <td className="px-6 py-3.5 font-bold text-[#202824] flex items-center space-x-2.5">
+                        <span className={`w-3 h-3 rounded-md ${app.color}`} />
+                        <span>{app.name}</span>
+                      </td>
+                      <td className="px-6 py-3.5 text-[#525B55] font-medium">{app.destination}</td>
+                      <td className="px-6 py-3.5 font-mono text-[11px] text-[#758078]">
+                        {app.roles.join(", ")}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        {hasAccess ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 inline-flex items-center space-x-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Diizinkan</span>
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200 inline-flex items-center space-x-1">
+                            <Lock className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Dibatasi</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3.5 text-right">
+                        <button
+                          onClick={() => {
+                            if (!hasAccess) {
+                              alert(`Akses Ditolak (SR-15) untuk role ${user?.role}`);
+                              return;
+                            }
+                            if (app.key === "sales") router.push("/sales/orders");
+                            else if (app.key === "crm") router.push("/crm/leads");
+                            else if (app.key === "inventory") router.push("/inventory/products");
+                            else if (app.key === "purchase") router.push("/purchase/orders");
+                            else if (app.key === "invoicing") router.push("/accounting/invoices");
+                            else if (app.key === "accounting") router.push("/accounting/journal-entries");
+                            else if (app.key === "pos") router.push("/pos");
+                            else if (app.key === "dashboard") router.push("/dashboard");
+                          }}
+                          className="text-xs font-semibold text-[#174A3A] hover:underline"
+                        >
+                          Buka Modul &rarr;
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Interactive Test Panel for T-01 & T-02 */}
+      <div className="bg-[#103429] text-white rounded-xl shadow-md p-6 border border-[#C6A15B]/30 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#C6A15B] text-[#103429]">
+                QA Test Automation Runner
+              </span>
+              <span className="text-xs text-[#DCE8DF] font-semibold">T-01 & T-02 Suite</span>
+            </div>
+            <h3 className="text-base font-bold mt-1 text-white">
+              Verifikasi Pengujian Wajib: Navigasi Owner & Proteksi RBAC GL
+            </h3>
+            <p className="text-xs text-[#DCE8DF]/80">
+              Uji langsung kepatuhan F-01 (Navigasi), F-21 (Audit Trail), dan aturan otorisasi ketat SR-15.
             </p>
           </div>
 
-          {/* View Modes (List, Kanban, Form, Activity) */}
-          <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200 self-start sm:self-auto">
+          <div className="flex items-center flex-wrap gap-2">
             <button
-              onClick={() => setActiveTab("kanban")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "kanban"
-                  ? "bg-white text-[#714B67] shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              onClick={runTestT01}
+              disabled={testing}
+              className="px-3.5 py-2 text-xs font-bold rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white flex items-center space-x-1.5 shadow-xs active:scale-95 transition-all"
             >
-              Kanban
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-01 (Owner Normal)</span>
             </button>
+
             <button
-              onClick={() => setActiveTab("list")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "list"
-                  ? "bg-white text-[#714B67] shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              onClick={runTestT02}
+              disabled={testing}
+              className="px-3.5 py-2 text-xs font-bold rounded-lg bg-rose-700 hover:bg-rose-600 text-white flex items-center space-x-1.5 shadow-xs active:scale-95 transition-all"
             >
-              List
-            </button>
-            <button
-              onClick={() => setActiveTab("form")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "form"
-                  ? "bg-white text-[#714B67] shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              Form
-            </button>
-            <button
-              onClick={() => setActiveTab("activity")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "activity"
-                  ? "bg-white text-[#714B67] shadow-xs"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              Activity
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-02 (Cashier GL Edge Case)</span>
             </button>
           </div>
         </div>
 
-        {/* Wireframe S-01 Section 3: Company & User Role Card */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5 flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-[#714B67]">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Company Identity
-              </span>
-              <h3 className="text-base font-bold text-gray-900">PT Rasa Aruna Bersama</h3>
-              <p className="text-xs text-gray-500">Brand: Rasa Aruna Kitchen (F&B Jakarta)</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5 flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Active User & Role
-              </span>
-              <h3 className="text-base font-bold text-gray-900 flex items-center space-x-2">
-                <span>{user?.name || "Loading..."}</span>
-                <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-[#714B67] text-white">
-                  {user?.role || "GUEST"}
+        {testResult && (
+          <div className="bg-[#081B15] border border-[#C6A15B]/40 rounded-xl p-4 space-y-2.5 text-xs animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-[#C6A15B] font-mono text-sm">
+                  [{testResult.id}]
                 </span>
-              </h3>
-              <p className="text-xs text-gray-500 font-mono">{user?.email}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5 flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700">
-              <MapPin className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Default Location
-              </span>
-              <h3 className="text-base font-bold text-gray-900">WH-JKT (Gudang Pusat)</h3>
-              <p className="text-xs text-gray-500">Secondary: CAFE-JKT (Gerai & Kasir)</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Wireframe S-01 Section 4: Akses Modul Berdasar Role */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase">
-                ④ Akses Modul Berdasarkan Role (SR-15)
-              </h2>
-              <p className="text-xs text-gray-500">
-                Pintasan aplikasi dan matriks hak otorisasi yang sedang aktif.
-              </p>
-            </div>
-            <button
-              onClick={() => setAppSwitcherOpen(true)}
-              className="text-xs font-semibold text-[#714B67] hover:text-[#5a3a52] flex items-center space-x-1"
-            >
-              <span>Buka Menu Apps (▦)</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {activeTab === "kanban" ? (
-            /* Kanban Mode */
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {APPS_CATALOG.map((app) => {
-                const hasAccess = user ? app.roles.includes(user.role) : false;
-                const IconComponent = app.icon;
-
-                return (
-                  <div
-                    key={app.key}
-                    onClick={() => {
-                      if (!hasAccess) {
-                        alert(`Akses Ditolak (SR-15): Modul ${app.name} dibatasi untuk role: ${app.roles.join(", ")}.`);
-                        return;
-                      }
-                      if (app.key === "sales") router.push("/sales/orders");
-                      else if (app.key === "crm") router.push("/crm/leads");
-                      else if (app.key === "inventory") router.push("/inventory/products");
-                      else if (app.key === "purchase") router.push("/purchase/orders");
-                      else if (app.key === "invoicing") router.push("/accounting/invoices");
-                      else if (app.key === "accounting") router.push("/accounting/journal-entries");
-                      else if (app.key === "pos") router.push("/pos");
-                      else if (app.key === "dashboard") router.push("/dashboard");
-                      else alert(`Membuka modul: ${app.name} (${app.destination}).`);
-                    }}
-                    className={`rounded-xl border p-4 transition-all relative flex flex-col justify-between cursor-pointer ${
-                      hasAccess
-                        ? "bg-white border-gray-200 hover:border-purple-300 hover:shadow-md hover:-translate-y-0.5"
-                        : "bg-gray-50 border-dashed border-gray-300 opacity-60"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-white ${app.color} shadow-xs`}
-                        >
-                          <IconComponent className="w-5 h-5" />
-                        </div>
-                        {hasAccess ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 flex items-center space-x-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Authorized</span>
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 flex items-center space-x-1">
-                            <Lock className="w-3 h-3" />
-                            <span>Restricted</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="font-bold text-sm text-gray-900">{app.name}</h4>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                        {app.desc}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
-                      <span className="text-gray-500 font-medium">Tujuan:</span>
-                      <span className="font-semibold text-gray-800">{app.destination}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            /* List View Mode */
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-gray-700">
-                <thead className="bg-gray-100 text-gray-600 font-semibold uppercase tracking-wider text-[11px] border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3">Aplikasi</th>
-                    <th className="px-6 py-3">Destination</th>
-                    <th className="px-6 py-3">Wewenang Role</th>
-                    <th className="px-6 py-3">Status Akses Role Ini</th>
-                    <th className="px-6 py-3 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {APPS_CATALOG.map((app) => {
-                    const hasAccess = user ? app.roles.includes(user.role) : false;
-                    return (
-                      <tr key={app.key} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-3.5 font-bold text-gray-900 flex items-center space-x-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${app.color}`} />
-                          <span>{app.name}</span>
-                        </td>
-                        <td className="px-6 py-3.5 text-gray-700 font-medium">{app.destination}</td>
-                        <td className="px-6 py-3.5 font-mono text-[11px] text-gray-500">
-                          {app.roles.join(", ")}
-                        </td>
-                        <td className="px-6 py-3.5">
-                          {hasAccess ? (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center space-x-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Diizinkan</span>
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 inline-flex items-center space-x-1">
-                              <Lock className="w-3.5 h-3.5" />
-                              <span>Dibatasi</span>
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-3.5 text-right">
-                          <button
-                            onClick={() => {
-                              if (hasAccess) alert(`Navigasi ke ${app.name}`);
-                              else alert(`Akses ditolak (SR-15)`);
-                            }}
-                            className="text-xs font-semibold text-[#714B67] hover:underline"
-                          >
-                            Buka Modul
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Interactive Test Panel for T-01 & T-02 */}
-        <div className="bg-purple-900 text-white rounded-xl shadow-md p-6 border border-purple-700 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-gray-950">
-                QA Test Automation Runner
-              </span>
-              <h3 className="text-base font-bold mt-1 text-white">
-                Verifikasi Pengujian Wajib: T-01 & T-02
-              </h3>
-              <p className="text-xs text-purple-200">
-                Uji langsung kesesuaian F-01 (Navigasi), F-21 (Audit Trail), dan aturan otorisasi SR-15.
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={runTestT01}
-                disabled={testing}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Uji T-01 (Owner Normal)</span>
-              </button>
-
-              <button
-                onClick={runTestT02}
-                disabled={testing}
-                className="px-3 py-2 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center space-x-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Uji T-02 (Cashier GL Edge Case)</span>
-              </button>
-            </div>
-          </div>
-
-          {testResult && (
-            <div className="bg-gray-950/70 border border-purple-400/30 rounded-lg p-4 space-y-2 text-xs animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-amber-300 font-mono text-sm">
-                    [{testResult.id}]
-                  </span>
-                  <span className="font-semibold text-white">{testResult.name}</span>
-                </div>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full font-bold font-mono text-xs ${
-                    testResult.status === "PASS"
-                      ? "bg-emerald-500 text-gray-950"
-                      : "bg-rose-500 text-white"
-                  }`}
-                >
-                  {testResult.status}
-                </span>
+                <span className="font-semibold text-white">{testResult.name}</span>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
-                <div>
-                  <span className="text-gray-400 font-semibold block">Expected Result:</span>
-                  <p className="text-gray-200 mt-0.5">{testResult.expected}</p>
-                </div>
-                <div>
-                  <span className="text-gray-400 font-semibold block">Actual Result:</span>
-                  <p className="text-emerald-300 mt-0.5 font-mono">{testResult.actual}</p>
-                </div>
-              </div>
-
-              {testResult.auditLogRef && (
-                <div className="pt-2 border-t border-gray-800 text-[11px] text-amber-200 flex items-center justify-between">
-                  <span>📌 Bukti Audit: {testResult.auditLogRef}</span>
-                  <button
-                    onClick={() => setAuditDrawerOpen(true)}
-                    className="underline hover:text-white font-semibold"
-                  >
-                    Buka Drawer Audit Trail &rarr;
-                  </button>
-                </div>
-              )}
+              <span
+                className={`px-3 py-0.5 rounded-full font-bold font-mono text-xs ${
+                  testResult.status === "PASS"
+                    ? "bg-emerald-500 text-gray-950"
+                    : "bg-rose-500 text-white"
+                }`}
+              >
+                {testResult.status}
+              </span>
             </div>
-          )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] pt-1">
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block">Expected Result:</span>
+                <p className="text-[#DCE8DF] leading-relaxed">{testResult.expected}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block">Actual Result:</span>
+                <p className="text-emerald-300 font-mono leading-relaxed">{testResult.actual}</p>
+              </div>
+            </div>
+
+            {testResult.auditLogRef && (
+              <div className="pt-2.5 border-t border-white/10 text-[11px] text-[#C6A15B] flex items-center justify-between">
+                <span>📌 Bukti Audit: {testResult.auditLogRef}</span>
+                <span className="text-[#DCE8DF] font-medium">Tercatat di Audit Trail Database</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Wireframe S-01 Section 5: Footer Links */}
+      <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-[#758078] gap-3">
+        <div className="flex items-center space-x-4">
+          <span className="font-semibold text-[#202824]">Dokumen Bawaan Baseline:</span>
+          <span className="font-mono text-[#174A3A] font-semibold">S00006, P00006, LD0003</span>
+          <span>•</span>
+          <span className="text-[#202824] font-medium">Saldo Awal Bank: Rp 20.000.000</span>
+          <span>•</span>
+          <span className="text-emerald-700 font-medium font-mono font-semibold">Dr = Cr = Rp 33.714.000</span>
         </div>
 
-        {/* Wireframe S-01 Section 5: Footer Links */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-gray-600 gap-3">
-          <div className="flex items-center space-x-4">
-            <span className="font-semibold text-gray-800">⑤ Navigasi Cepat Dokumen:</span>
-            <button
-              onClick={() => alert("Dokumen Terkait: S00006, P00006, LD0003")}
-              className="text-[#714B67] hover:underline font-medium"
-            >
-              Related Docs (3)
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => alert("Log Notes: Sistem ERP Rasa Aruna v1.0.0 siap digunakan.")}
-              className="text-[#714B67] hover:underline font-medium"
-            >
-              Log Notes
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setAuditDrawerOpen(true)}
-              className="text-[#714B67] hover:underline font-medium font-semibold"
-            >
-              Audit / History
-            </button>
-          </div>
-
-          <div className="text-[11px] text-gray-400">
-            Odoo Web Version 17.0 UI Framework · Desktop Browser Experience
-          </div>
+        <div className="text-[11px] text-[#758078]">
+          Rasa Aruna Kitchen ERP · Odoo 17 & SAP Fiori Refined Experience
         </div>
-      </main>
-
-      {/* App Switcher Modal (▦ Apps) */}
-      <AppSwitcherModal
-        isOpen={appSwitcherOpen}
-        onClose={() => setAppSwitcherOpen(false)}
-        userRole={user?.role}
-        onSelectApp={(appKey) => {
-          alert(`Membuka aplikasi: ${appKey}`);
-        }}
-      />
-
-      {/* Reset Seed Modal with Strict Owner Authorization & Warning */}
-      <ResetSeedModal
-        isOpen={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-        currentUserRole={user?.role}
-        onSuccess={() => {
-          fetchSession();
-          alert("Database berhasil dipulihkan ke Baseline Seed.");
-        }}
-      />
-
-      {/* Audit History Drawer */}
-      <AuditHistoryDrawer
-        isOpen={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-      />
-    </div>
+      </div>
+    </AppLayout>
   );
 }

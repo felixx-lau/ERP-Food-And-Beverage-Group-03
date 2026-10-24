@@ -1,23 +1,38 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import HeaderNavbar from "@/components/HeaderNavbar";
-import AppSwitcherModal from "@/components/AppSwitcherModal";
-import ResetSeedModal from "@/components/ResetSeedModal";
-import AuditHistoryDrawer from "@/components/AuditHistoryDrawer";
-import { ArrowLeft, Play, Store, CheckCircle2, Lock, Plus, ShoppingBag, Receipt, ShieldAlert, X } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import AppLayout from "@/components/AppLayout";
+import StatusBadge from "@/components/StatusBadge";
+import KPICard from "@/components/KPICard";
+import {
+  Store,
+  Play,
+  CheckCircle2,
+  Lock,
+  Plus,
+  ShoppingBag,
+  Receipt,
+  ShieldAlert,
+  X,
+  CreditCard,
+  DollarSign,
+  Coffee,
+  Search,
+  RefreshCw,
+  Trash2,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 
 export default function PointOfSalePage() {
-  const [user, setUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [appSwitcherOpen, setAppSwitcherOpen] = useState(false);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
+  const [searchProduct, setSearchProduct] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
 
   // Cart / Basket State
   const [cart, setCart] = useState<Array<{ sku: string; name: string; qty: number; price: number }>>([
@@ -37,10 +52,14 @@ export default function PointOfSalePage() {
   const [testing, setTesting] = useState(false);
 
   const fetchSession = async () => {
-    const res = await fetch("/api/auth/me");
-    if (res.ok) {
-      const data = await res.json();
-      setUser(data.user);
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUser(data.user);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -88,7 +107,7 @@ export default function PointOfSalePage() {
     });
     if (res.ok) {
       const data = await res.json();
-      setUser(data.user);
+      setCurrentUser(data.user);
     }
   };
 
@@ -112,6 +131,8 @@ export default function PointOfSalePage() {
         .filter((item) => item.qty > 0)
     );
   };
+
+  const clearCart = () => setCart([]);
 
   // Calculations
   const subtotalNet = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
@@ -153,7 +174,7 @@ export default function PointOfSalePage() {
         return;
       }
 
-      alert(`Pesanan ${data.order?.orderNumber} berhasil dibayar senilai Rp ${data.order?.totalAmount?.toLocaleString("id-ID")}!`);
+      alert(`Pesanan ${data.order?.orderNumber} berhasil dibayar senilai Rp${data.order?.totalAmount?.toLocaleString("id-ID")}!`);
       setCart([]);
       await fetchSessionsAndOrders();
     } catch (e) {
@@ -204,13 +225,30 @@ export default function PointOfSalePage() {
     }
   };
 
+  // Filtered products
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((p) => p.sku.startsWith("COF-") || p.sku.startsWith("COOKIE-") || p.sku.startsWith("TEA-") || p.sku.startsWith("JUICE-"))
+      .filter((p) => {
+        const matchSearch =
+          p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
+          p.sku.toLowerCase().includes(searchProduct.toLowerCase());
+        const matchCat =
+          categoryFilter === "ALL" ||
+          (categoryFilter === "COFFEE" && p.sku.startsWith("COF-")) ||
+          (categoryFilter === "TEA" && p.sku.startsWith("TEA-")) ||
+          (categoryFilter === "BAKERY" && p.sku.startsWith("COOKIE-")) ||
+          (categoryFilter === "BEVERAGE" && p.sku.startsWith("JUICE-"));
+        return matchSearch && matchCat;
+      });
+  }, [products, searchProduct, categoryFilter]);
+
   // Run Test T-27
   const runTestT27 = async () => {
     setTesting(true);
     try {
       await handleSwitchRole("CASHIER");
 
-      // 1. Ensure POS01 session is open
       let session = sessions.find((s) => s.sessionCode === "POS01" && s.status === "OPEN");
       if (!session) {
         const resOpen = await fetch("/api/pos/sessions", {
@@ -226,7 +264,6 @@ export default function PointOfSalePage() {
         session = dataOpen.session;
       }
 
-      // 2. Checkout 2 x COF-LATT-HOT and 1 x COOKIE-CHO-1 from CAFE-JKT paid QRIS/Bank
       const resOrder = await fetch("/api/pos/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -254,7 +291,6 @@ export default function PointOfSalePage() {
         return;
       }
 
-      // Check product stock at CAFE-JKT
       const resHot = await fetch("/api/products/COF-LATT-HOT");
       const dataHot = await resHot.json();
       const cafeHot = dataHot.stocks?.find((s: any) => s.locationCode === "CAFE-JKT")?.onHandQty;
@@ -306,7 +342,6 @@ export default function PointOfSalePage() {
         session = dataOpen.session;
       }
 
-      // Step 1: Try checkout 25 x COF-LATT-HOT (current on-hand is <= 24)
       const resExcess = await fetch("/api/pos/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -319,7 +354,6 @@ export default function PointOfSalePage() {
       const dataExcess = await resExcess.json();
       const blockedOk = resExcess.status === 400 && dataExcess.error.includes("melebihi stok fisik On-Hand");
 
-      // Step 2: Test Close Session and Idempotent repeat
       const resClose1 = await fetch(`/api/pos/sessions/${session.id}/close`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -352,47 +386,37 @@ export default function PointOfSalePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-      <HeaderNavbar
-        currentUser={user}
-        onSwitchRole={handleSwitchRole}
-        onOpenResetModal={() => setResetModalOpen(true)}
-        onOpenAuditDrawer={() => setAuditDrawerOpen(true)}
-        onOpenAppSwitcher={() => setAppSwitcherOpen(true)}
-      />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Wireframe S-14 Header */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/"
-              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                  Point of Sale Restoran
-                </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-800">
-                  Wireframe S-14
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Modul: <strong className="text-gray-700">Point of Sale</strong> · Roles: Cashier, Owner · Fitur: <strong>F-16, F-17, F-22, SR-03, SR-04, SR-14</strong>
-              </p>
+    <AppLayout
+      currentUser={currentUser}
+      onSwitchRole={handleSwitchRole}
+      breadcrumbs={[
+        { label: "Point of Sale", href: "/pos" },
+        { label: "Kasir POS CAFE-JKT (S-14)" },
+      ]}
+    >
+      <div className="space-y-6">
+        {/* Module Header & Session Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-[#DCE8DF] shadow-xs">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#174A3A]" />
+              <h1 className="text-xl font-bold text-[#202824] tracking-tight">
+                Point of Sale Restoran (CAFE-JKT)
+              </h1>
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-[#DCE8DF] text-[#174A3A]">
+                Wireframe S-14
+              </span>
             </div>
+            <p className="text-xs text-[#758078] mt-1">
+              Kasir gerai cepat, sinkronisasi stok fisik instan, PBJT 10% & penutupan sesi kasir (F-16, F-17, SR-03, SR-04, SR-14).
+            </p>
           </div>
 
-          {/* Session Info & Actions */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             {activeSession?.status === "OPEN" ? (
               <button
                 onClick={() => setCloseModalOpen(true)}
-                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-2xs"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-xs transition-colors"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>Tutup Sesi ({activeSession.sessionCode})</span>
@@ -400,99 +424,172 @@ export default function PointOfSalePage() {
             ) : (
               <button
                 onClick={handleOpenSession}
-                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-2xs"
+                className="px-4 py-2 bg-[#174A3A] hover:bg-[#103429] text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-xs transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 text-[#C6A15B]" />
                 <span>Buka Sesi Kasir Baru</span>
               </button>
             )}
+
+            <button
+              onClick={fetchSessionsAndOrders}
+              className="p-2 rounded-lg border border-[#DCE8DF] text-[#758078] hover:text-[#174A3A] hover:bg-[#F7F8F5] transition-colors"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Active Session Status Bar (Wireframe S-14 Section ②) */}
+        <div className="card-aruna p-4 bg-[#F7F8F5] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-[#758078] uppercase tracking-wider">Sesi Aktif:</span>
+              <span className="font-mono font-bold text-sm text-[#174A3A]">
+                {activeSession?.sessionCode || "POS01"}
+              </span>
+            </div>
+            <span className="text-[#DCE8DF]">|</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-[#758078]">Lokasi Gerai:</span>
+              <span className="font-mono font-semibold text-xs text-[#202824]">CAFE-JKT</span>
+            </div>
+            <span className="text-[#DCE8DF]">|</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-[#758078]">Modal Awal:</span>
+              <span className="font-mono font-semibold text-xs text-[#202824]">
+                Rp{activeSession?.openingCash?.toLocaleString("id-ID") || "0"}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <StatusBadge status={activeSession?.status || "CLOSED"} />
+            <span className="text-xs text-[#758078]">
+              Kasir: <strong className="text-[#202824]">{currentUser?.name || "Citra Dewi"}</strong>
+            </span>
           </div>
         </div>
 
         {/* Wireframe S-14 Main Workspace: Products Grid (Left) + Basket / POS Checkout (Right) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Product Selection Catalog */}
+          {/* Left Column: Product Selection Catalog & Category Filters */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-                <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center space-x-1.5">
-                  <Store className="w-4 h-4 text-rose-600" />
-                  <span>Katalog Produk Gerai CAFE-JKT</span>
-                </h2>
-                <span className="text-xs text-gray-500">Klik item untuk menambah ke keranjang</span>
+            <div className="card-aruna p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#DCE8DF]">
+                <div>
+                  <h2 className="text-sm font-bold text-[#202824] uppercase tracking-wider flex items-center space-x-2">
+                    <Store className="w-4 h-4 text-[#174A3A]" />
+                    <span>Katalog Menu Gerai CAFE-JKT</span>
+                  </h2>
+                  <p className="text-xs text-[#758078] mt-0.5">Klik menu untuk menambah cepat ke keranjang</p>
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#758078]" />
+                  <input
+                    type="text"
+                    placeholder="Cari kopi, pastry, dll..."
+                    value={searchProduct}
+                    onChange={(e) => setSearchProduct(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-xs bg-[#F7F8F5] border border-[#DCE8DF] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#174A3A] text-[#202824]"
+                  />
+                </div>
               </div>
 
+              {/* Category Pills */}
+              <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                {[
+                  { key: "ALL", label: "Semua Menu" },
+                  { key: "COFFEE", label: "Coffee" },
+                  { key: "TEA", label: "Tea" },
+                  { key: "BAKERY", label: "Bakery / Cookies" },
+                  { key: "BEVERAGE", label: "Juice / Beverages" },
+                ].map((cat) => (
+                  <button
+                    key={cat.key}
+                    onClick={() => setCategoryFilter(cat.key)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                      categoryFilter === cat.key
+                        ? "bg-[#174A3A] text-white"
+                        : "bg-[#F7F8F5] text-[#758078] hover:text-[#202824] hover:bg-[#DCE8DF]/50"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Product Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {products
-                  .filter((p) => p.sku.startsWith("COF-") || p.sku.startsWith("COOKIE-") || p.sku.startsWith("TEA-") || p.sku.startsWith("JUICE-"))
-                  .map((product) => (
-                    <button
-                      key={product.sku}
-                      onClick={() => addToCart(product)}
-                      className="text-left p-3 rounded-lg border border-gray-200 hover:border-rose-400 hover:shadow-xs transition-all bg-gray-50/50 hover:bg-white flex flex-col justify-between"
-                    >
-                      <div>
-                        <span className="text-[10px] font-mono font-bold text-rose-700 block">
-                          {product.sku}
-                        </span>
-                        <h4 className="text-xs font-bold text-gray-900 mt-0.5 line-clamp-1">
-                          {product.name}
-                        </h4>
-                        <span className="text-[11px] text-gray-500 block">
-                          {product.size} · {product.color}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between border-t border-gray-200/60 pt-2">
-                        <span className="text-xs font-mono font-bold text-gray-900">
-                          Rp{product.salesPrice.toLocaleString("id-ID")}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-bold">
-                          + Tambah
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                {filteredProducts.map((product) => (
+                  <button
+                    key={product.sku}
+                    onClick={() => addToCart(product)}
+                    className="text-left p-3.5 rounded-xl border border-[#DCE8DF] hover:border-[#174A3A] hover:shadow-xs transition-all bg-[#F7F8F5]/60 hover:bg-white flex flex-col justify-between group"
+                  >
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-[#174A3A] block">
+                        {product.sku}
+                      </span>
+                      <h4 className="text-xs font-bold text-[#202824] mt-1 line-clamp-1 group-hover:text-[#174A3A] transition-colors">
+                        {product.name}
+                      </h4>
+                      <span className="text-[11px] text-[#758078] block mt-0.5">
+                        {product.size || "Standard"} · {product.color || "Default"}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t border-[#DCE8DF] pt-2">
+                      <span className="text-xs font-mono font-bold text-[#202824]">
+                        Rp{product.salesPrice.toLocaleString("id-ID")}
+                      </span>
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-[#DCE8DF] text-[#174A3A] font-bold group-hover:bg-[#174A3A] group-hover:text-white transition-colors">
+                        + Tambah
+                      </span>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Recent Orders in Session */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4">
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                Riwayat Pesanan Kasir Sesi Ini
+            <div className="card-aruna p-5">
+              <h3 className="text-xs font-bold text-[#202824] uppercase tracking-wider mb-3 flex items-center space-x-2">
+                <Receipt className="w-4 h-4 text-[#174A3A]" />
+                <span>Riwayat Pesanan Kasir Sesi Ini</span>
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold uppercase">
+                  <thead className="bg-[#F7F8F5] border-b border-[#DCE8DF] text-[#758078] font-semibold uppercase">
                     <tr>
-                      <th className="py-2 px-3">No. Struk</th>
-                      <th className="py-2 px-3">Waktu</th>
-                      <th className="py-2 px-3">Metode</th>
-                      <th className="py-2 px-3 text-right">Total (Gross)</th>
-                      <th className="py-2 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3">No. Struk POS</th>
+                      <th className="py-2.5 px-3">Waktu</th>
+                      <th className="py-2.5 px-3">Metode Bayar</th>
+                      <th className="py-2.5 px-3 text-right">Total Tagihan</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 font-mono">
+                  <tbody className="divide-y divide-[#DCE8DF] font-mono">
                     {orders.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-4 text-center text-gray-400 font-sans">
-                          Belum ada transaksi di sesi ini.
+                        <td colSpan={5} className="py-6 text-center text-[#758078] font-sans">
+                          Belum ada transaksi di sesi ini. Silakan tambahkan item ke keranjang dan checkout.
                         </td>
                       </tr>
                     ) : (
                       orders.slice(0, 5).map((o) => (
-                        <tr key={o.id} className="hover:bg-gray-50">
-                          <td className="py-2 px-3 font-bold text-rose-800">{o.orderNumber}</td>
-                          <td className="py-2 px-3 font-sans text-gray-600">
+                        <tr key={o.id} className="hover:bg-[#F7F8F5] transition-colors">
+                          <td className="py-2.5 px-3 font-bold text-[#174A3A]">{o.orderNumber}</td>
+                          <td className="py-2.5 px-3 font-sans text-[#758078]">
                             {new Date(o.orderDate).toLocaleTimeString("id-ID")}
                           </td>
-                          <td className="py-2 px-3 font-sans text-gray-700">{o.paymentMethod}</td>
-                          <td className="py-2 px-3 text-right font-bold text-gray-900">
+                          <td className="py-2.5 px-3 font-sans text-[#202824]">{o.paymentMethod}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-[#202824]">
                             Rp{o.totalAmount?.toLocaleString("id-ID")}
                           </td>
-                          <td className="py-2 px-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
-                              {o.status}
-                            </span>
+                          <td className="py-2.5 px-3 text-center">
+                            <StatusBadge status={o.status} />
                           </td>
                         </tr>
                       ))
@@ -504,31 +601,27 @@ export default function PointOfSalePage() {
           </div>
 
           {/* Right Column: Basket, Totals, and Checkout (Wireframe S-14 Section ③ & ④) */}
-          <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5 flex flex-col justify-between space-y-4">
+          <div className="card-aruna p-5 flex flex-col justify-between space-y-4">
             <div>
               {/* S-14 Section ② & ③: Session & Modes */}
-              <div className="border-b border-gray-200 pb-3 mb-3">
+              <div className="border-b border-[#DCE8DF] pb-3 mb-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-[#758078] uppercase tracking-wider">
                     Sesi: {activeSession?.sessionCode || "POS01"}
                   </span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    activeSession?.status === "OPEN" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
-                  }`}>
-                    {activeSession?.status || "CLOSED"}
-                  </span>
+                  <StatusBadge status={activeSession?.status || "CLOSED"} />
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase block">Lokasi</label>
-                    <span className="font-mono font-bold text-gray-800">CAFE-JKT</span>
+                    <label className="text-[10px] font-semibold text-[#758078] uppercase block mb-1">Lokasi Stok</label>
+                    <span className="font-mono font-bold text-[#174A3A] text-xs">CAFE-JKT</span>
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase block">Meja / Layanan</label>
+                    <label className="text-[10px] font-semibold text-[#758078] uppercase block mb-1">Layanan / Meja</label>
                     <select
                       value={tableInfo}
                       onChange={(e) => setTableInfo(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-0.5 font-bold text-xs"
+                      className="w-full border border-[#DCE8DF] rounded-lg px-2.5 py-1 font-bold text-xs bg-white text-[#202824] focus:outline-none focus:ring-1 focus:ring-[#174A3A]"
                     >
                       <option value="Takeaway">Takeaway</option>
                       <option value="Meja 01">Meja 01</option>
@@ -540,43 +633,59 @@ export default function PointOfSalePage() {
               </div>
 
               {/* Basket Items (Wireframe S-14 Section ④) */}
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-                <ShoppingBag className="w-3.5 h-3.5 text-rose-600" />
-                <span>④ Keranjang Belanja (Basket)</span>
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-[#202824] uppercase tracking-wider flex items-center space-x-1.5">
+                  <ShoppingBag className="w-3.5 h-3.5 text-[#174A3A]" />
+                  <span>④ Keranjang Belanja (Basket)</span>
+                </h3>
+                {cart.length > 0 && (
+                  <button
+                    onClick={clearCart}
+                    className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold"
+                  >
+                    Kosongkan
+                  </button>
+                )}
+              </div>
 
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {cart.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic py-4 text-center">Keranjang masih kosong.</p>
+                  <div className="text-center py-8 text-[#758078] text-xs space-y-1">
+                    <ShoppingBag className="w-6 h-6 mx-auto text-[#DCE8DF]" />
+                    <p>Keranjang masih kosong.</p>
+                    <p className="text-[11px]">Pilih menu di sebelah kiri untuk memesan.</p>
+                  </div>
                 ) : (
                   cart.map((item) => (
                     <div
                       key={item.sku}
-                      className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-200 text-xs"
+                      className="flex items-center justify-between p-2.5 rounded-lg bg-[#F7F8F5] border border-[#DCE8DF] text-xs"
                     >
                       <div>
-                        <span className="font-bold text-gray-900 block">{item.name}</span>
-                        <span className="text-[10px] text-gray-500 font-mono">
-                          {item.sku} · Rp{item.price.toLocaleString("id-ID")}
+                        <span className="font-bold text-[#202824] block">{item.name}</span>
+                        <span className="text-[10px] text-[#758078] font-mono">
+                          {item.sku} • Rp{item.price.toLocaleString("id-ID")}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <div className="flex items-center border border-gray-300 rounded bg-white font-mono">
+                        <div className="flex items-center border border-[#DCE8DF] rounded-lg bg-white font-mono shadow-2xs overflow-hidden">
                           <button
                             onClick={() => updateCartQty(item.sku, -1)}
-                            className="px-2 py-0.5 hover:bg-gray-100 font-bold"
+                            className="px-2 py-0.5 hover:bg-[#F7F8F5] text-[#202824] font-bold"
                           >
                             -
                           </button>
-                          <span className="px-2 py-0.5 font-bold text-rose-800">{item.qty}</span>
+                          <span className="px-2 py-0.5 font-bold text-[#174A3A] min-w-5 text-center">
+                            {item.qty}
+                          </span>
                           <button
                             onClick={() => updateCartQty(item.sku, 1)}
-                            className="px-2 py-0.5 hover:bg-gray-100 font-bold"
+                            className="px-2 py-0.5 hover:bg-[#F7F8F5] text-[#202824] font-bold"
                           >
                             +
                           </button>
                         </div>
-                        <span className="font-mono font-bold text-gray-800 w-16 text-right">
+                        <span className="font-mono font-bold text-[#202824] w-16 text-right">
                           Rp{(item.qty * item.price).toLocaleString("id-ID")}
                         </span>
                       </div>
@@ -587,42 +696,48 @@ export default function PointOfSalePage() {
             </div>
 
             {/* Financial Summary & Payment */}
-            <div className="space-y-3 pt-3 border-t border-gray-200 text-xs">
-              <div className="space-y-1.5 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <div className="flex justify-between text-gray-600">
+            <div className="space-y-3 pt-3 border-t border-[#DCE8DF] text-xs">
+              <div className="space-y-1.5 bg-[#F7F8F5] p-3.5 rounded-xl border border-[#DCE8DF]">
+                <div className="flex justify-between text-[#758078]">
                   <span>Subtotal Net:</span>
-                  <span className="font-mono font-semibold">Rp{subtotalNet.toLocaleString("id-ID")}</span>
+                  <span className="font-mono font-semibold text-[#202824]">
+                    Rp{subtotalNet.toLocaleString("id-ID")}
+                  </span>
                 </div>
-                <div className="flex justify-between text-rose-700">
+                <div className="flex justify-between text-[#174A3A]">
                   <span>PBJT 10% Restoran:</span>
-                  <span className="font-mono font-semibold">Rp{pbjtTax.toLocaleString("id-ID")}</span>
+                  <span className="font-mono font-semibold">
+                    Rp{pbjtTax.toLocaleString("id-ID")}
+                  </span>
                 </div>
-                <div className="border-t border-gray-300 pt-1.5 flex justify-between text-gray-900 font-extrabold text-sm">
+                <div className="border-t border-[#DCE8DF] pt-2 flex justify-between text-[#202824] font-extrabold text-sm">
                   <span>Total Tagihan:</span>
-                  <span className="font-mono text-rose-700">Rp{totalGross.toLocaleString("id-ID")}</span>
+                  <span className="font-mono text-[#174A3A] text-base">
+                    Rp{totalGross.toLocaleString("id-ID")}
+                  </span>
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">
+                <label className="text-[10px] font-semibold text-[#758078] uppercase block mb-1">
                   Metode Pembayaran
                 </label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 font-mono font-bold text-xs"
+                  className="w-full border border-[#DCE8DF] rounded-lg p-2 font-mono font-bold text-xs bg-white text-[#202824] focus:outline-none focus:ring-1 focus:ring-[#174A3A]"
                 >
-                  <option value="QRIS / Bank">QRIS / Bank (BCA)</option>
-                  <option value="Cash / Kas">Cash / Kas Tunai</option>
+                  <option value="QRIS / Bank">QRIS / Bank (BCA 1010)</option>
+                  <option value="Cash / Kas">Cash / Kas Tunai (1010)</option>
                 </select>
               </div>
 
               <button
                 onClick={handleCheckout}
                 disabled={cart.length === 0 || activeSession?.status !== "OPEN"}
-                className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-[#174A3A] hover:bg-[#103429] text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-2 shadow-xs transition-colors disabled:opacity-50"
               >
-                <Receipt className="w-4 h-4" />
+                <Receipt className="w-4 h-4 text-[#C6A15B]" />
                 <span>Bayar Sekarang (Rp{totalGross.toLocaleString("id-ID")})</span>
               </button>
             </div>
@@ -632,42 +747,57 @@ export default function PointOfSalePage() {
         {/* Modal Tutup Sesi */}
         {closeModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
-                <Lock className="w-5 h-5 text-rose-600" />
-                <span>Tutup Sesi Kasir ({activeSession?.sessionCode})</span>
-              </h2>
-              <p className="text-xs text-gray-600">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-[#DCE8DF]">
+              <div className="flex items-center justify-between border-b border-[#DCE8DF] pb-3">
+                <h2 className="text-base font-bold text-[#202824] flex items-center space-x-2">
+                  <Lock className="w-4 h-4 text-rose-600" />
+                  <span>Tutup Sesi Kasir ({activeSession?.sessionCode})</span>
+                </h2>
+                <button
+                  onClick={() => setCloseModalOpen(false)}
+                  className="text-[#758078] hover:text-[#202824]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#758078]">
                 Hitung kas fisik di laci kasir dan masukkan nominal aktual untuk rekonsiliasi selisih kas (SR-14).
               </p>
 
               <div className="space-y-3 text-xs">
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-1">
+                <div className="bg-[#F7F8F5] p-3 rounded-lg border border-[#DCE8DF] space-y-1.5">
                   <div className="flex justify-between">
-                    <span>Modal Awal Kas:</span>
-                    <span className="font-mono font-bold">Rp{activeSession?.openingCash?.toLocaleString("id-ID")}</span>
+                    <span className="text-[#758078]">Modal Awal Kas:</span>
+                    <span className="font-mono font-bold text-[#202824]">
+                      Rp{activeSession?.openingCash?.toLocaleString("id-ID")}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Akumulasi Penjualan Sesi:</span>
-                    <span className="font-mono font-bold text-green-700">Rp{activeSession?.totalSales?.toLocaleString("id-ID")}</span>
+                    <span className="text-[#758078]">Akumulasi Penjualan Sesi:</span>
+                    <span className="font-mono font-bold text-[#174A3A]">
+                      Rp{activeSession?.totalSales?.toLocaleString("id-ID")}
+                    </span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">Kas Fisik Aktual (Laci Kasir):</label>
+                  <label className="font-bold text-[#202824] block mb-1">
+                    Kas Fisik Aktual (Laci Kasir):
+                  </label>
                   <input
                     type="number"
                     value={closingCashInput}
                     onChange={(e) => setClosingCashInput(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg p-2 font-mono font-bold"
+                    className="w-full border border-[#DCE8DF] rounded-lg p-2 font-mono font-bold text-[#202824] focus:outline-none focus:ring-1 focus:ring-[#174A3A]"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4 border-t border-gray-100">
+              <div className="flex justify-end space-x-2 pt-4 border-t border-[#DCE8DF]">
                 <button
                   onClick={() => setCloseModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-[#DCE8DF] rounded-lg text-xs font-semibold text-[#758078] hover:bg-[#F7F8F5]"
                 >
                   Batal
                 </button>
@@ -676,7 +806,7 @@ export default function PointOfSalePage() {
                     await handleCloseSession();
                     setCloseModalOpen(false);
                   }}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold"
                 >
                   Konfirmasi Tutup Sesi
                 </button>
@@ -685,31 +815,35 @@ export default function PointOfSalePage() {
           </div>
         )}
 
-        {/* Interactive Test Suite for Phase 7 (T-27, T-28) */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+        {/* QA Automated Test Runner: T-27 & T-28 */}
+        <div className="bg-[#103429] text-white rounded-xl shadow-lg border border-[#174A3A] p-5 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#174A3A]/60 pb-4">
             <div>
-              <h2 className="text-sm font-bold text-gray-900 tracking-wide uppercase flex items-center space-x-2">
-                <Play className="w-4 h-4 text-rose-600" />
-                <span>Pengujian Modul Point of Sale (T-27 & T-28)</span>
-              </h2>
-              <p className="text-xs text-gray-500">
-                Verifikasi penjualan gerai CAFE-JKT, evaluasi stok negatif, dan penutupan sesi kasir (SR-03/SR-04/SR-14 / F-16 / F-17).
+              <div className="flex items-center space-x-2">
+                <Play className="w-4 h-4 text-[#C6A15B]" />
+                <h2 className="text-sm font-bold tracking-wide uppercase text-white">
+                  QA Automation Runner: Point of Sale Restoran (T-27 & T-28)
+                </h2>
+              </div>
+              <p className="text-xs text-[#DCE8DF]/80 mt-1">
+                Memverifikasi penjualan gerai CAFE-JKT, evaluasi batas stok fisik (SR-04), dan penutupan sesi kasir idempotent (SR-14 / F-16 / F-17).
               </p>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={runTestT27}
                 disabled={testing}
-                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 shadow-2xs disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-[#C6A15B] hover:bg-[#b08e4d] text-[#103429] rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
               >
+                <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Uji T-27 (Normal Flow)</span>
               </button>
               <button
                 onClick={runTestT28}
                 disabled={testing}
-                className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 shadow-2xs disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
               >
+                <ShieldAlert className="w-3.5 h-3.5" />
                 <span>Uji T-28 (Edge Case)</span>
               </button>
             </div>
@@ -717,10 +851,10 @@ export default function PointOfSalePage() {
 
           {testResult && (
             <div
-              className={`p-4 rounded-xl border text-xs space-y-2 ${
+              className={`p-4 rounded-xl border text-xs space-y-2.5 ${
                 testResult.status === "PASS"
-                  ? "bg-green-50 border-green-200 text-green-900"
-                  : "bg-rose-50 border-rose-200 text-rose-900"
+                  ? "bg-[#174A3A]/70 border-emerald-500/50 text-[#DCE8DF]"
+                  : "bg-rose-950/60 border-rose-500/50 text-rose-200"
               }`}
             >
               <div className="flex items-center justify-between font-bold">
@@ -728,46 +862,29 @@ export default function PointOfSalePage() {
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] uppercase font-mono ${
                       testResult.status === "PASS"
-                        ? "bg-green-200 text-green-800"
-                        : "bg-rose-200 text-rose-800"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-rose-500 text-white"
                     }`}
                   >
                     {testResult.status}
                   </span>
-                  <span>
+                  <span className="text-white text-sm">
                     {testResult.id} — {testResult.name}
                   </span>
                 </span>
               </div>
-              <p>
-                <strong>Ekspektasi:</strong> {testResult.expected}
-              </p>
-              <p className="font-mono">
-                <strong>Hasil Aktual:</strong> {testResult.actual}
-              </p>
+              <div className="space-y-1">
+                <p>
+                  <strong className="text-[#C6A15B]">Ekspektasi:</strong> {testResult.expected}
+                </p>
+                <p className="font-mono">
+                  <strong className="text-white">Hasil Aktual:</strong> {testResult.actual}
+                </p>
+              </div>
             </div>
           )}
         </div>
-      </main>
-
-      {/* Modals & Drawers */}
-      <AppSwitcherModal
-        isOpen={appSwitcherOpen}
-        onClose={() => setAppSwitcherOpen(false)}
-        userRole={user?.role || "CASHIER"}
-      />
-      <ResetSeedModal
-        isOpen={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-        userRole={user?.role || "CASHIER"}
-        onSuccess={() => {
-          fetchSessionsAndOrders();
-        }}
-      />
-      <AuditHistoryDrawer
-        isOpen={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-      />
-    </div>
+      </div>
+    </AppLayout>
   );
 }

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rasa Aruna Kitchen — ERP System (Odoo 17.0 Reference)",
-  description: "Enterprise ERP System for PT Rasa Aruna Bersama",
+  title: "PT Rasa Aruna Bersama — Rasa Aruna Kitchen ERP",
+  description: "Enterprise ERP System for PT Rasa Aruna Bersama (Food & Beverage)",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body className="min-h-screen bg-gray-50 text-gray-900 flex flex-col antialiased">
+      <body className="min-h-screen bg-[#F7F8F5] text-[#202824] flex flex-col antialiased">
         {children}
       </body>
     </html>

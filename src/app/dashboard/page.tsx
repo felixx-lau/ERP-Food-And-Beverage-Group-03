@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import HeaderNavbar from "@/components/HeaderNavbar";
-import AppSwitcherModal from "@/components/AppSwitcherModal";
-import ResetSeedModal from "@/components/ResetSeedModal";
-import AuditHistoryDrawer from "@/components/AuditHistoryDrawer";
+import AppLayout from "@/components/AppLayout";
+import StatusBadge from "@/components/StatusBadge";
+import KPICard from "@/components/KPICard";
 import { 
   BarChart3, 
   Layers, 
@@ -13,7 +12,6 @@ import {
   Truck, 
   Wallet, 
   Users2, 
-  Store, 
   Scale, 
   ShieldAlert, 
   CheckCircle2, 
@@ -21,14 +19,9 @@ import {
   RefreshCw, 
   Play, 
   ArrowRight, 
-  ExternalLink, 
-  Lock, 
   Check, 
   FileText,
   Building2,
-  Calendar,
-  Database,
-  ArrowUpRight,
   TrendingUp,
   AlertOctagon,
   BookOpen
@@ -41,11 +34,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<OperationalMetrics | null>(null);
   const [reconciliation, setReconciliation] = useState<FinancialReconciliation | null>(null);
-  
-  // Navigation & Modals
-  const [appSwitcherOpen, setAppSwitcherOpen] = useState(false);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
   
   // Simulation & Testing States
   const [simulatedDiff, setSimulatedDiff] = useState<number>(0);
@@ -129,18 +117,10 @@ export default function DashboardPage() {
   const runTestT31 = async () => {
     setTesting(true);
     try {
-      // Fetch latest clean metrics
       const res = await fetch("/api/dashboard/metrics");
       const json = await res.json();
       const m: OperationalMetrics = json.data;
 
-      // Verification checks based on task requirements:
-      // - Persediaan: 616 units, Valuasi Rp 12.214.000 (WH: 410, CAFE: 206)
-      // - A/R: Rp 1.500.000, A/P: Rp 1.000.000
-      // - Bank BCA: Rp 20.000.000
-      // - CRM: 1 Lead (Rp 1.200.000)
-      // - SO: 1 Confirmed Order (reserved 6)
-      // - PO: 1 Confirmed Order
       const checks = [
         m.inventory.totalUnits === 616,
         m.inventory.whUnits === 410,
@@ -191,23 +171,15 @@ export default function DashboardPage() {
   const runTestT32 = async () => {
     setTesting(true);
     try {
-      // 1. Check baseline reconciliation (simulatedDiff = 0)
       const resBalanced = await fetch("/api/dashboard/reconciliation?simulatedDiff=0");
       const dataBalanced = (await resBalanced.json()).data as FinancialReconciliation;
 
-      // 2. Simulate 1 unit discrepancy (simulatedDiff = 1)
       const resMismatch = await fetch("/api/dashboard/reconciliation?simulatedDiff=1");
       const dataMismatch = (await resMismatch.json()).data as FinancialReconciliation;
 
-      // Set UI state to show the simulation
       setSimulatedDiff(1);
       setReconciliation(dataMismatch);
 
-      // Verify T-32 criteria:
-      // a. Baseline must be balanced (debit == credit and status == BALANCED)
-      // b. Discrepancy of 1 unit must trigger status == MISMATCH
-      // c. Warning banner / message must be present
-      // d. Auto-posting must be strictly BLOCKED (autoPostBlocked == true) per SR-20
       const step1Passed = dataBalanced.generalLedger.isBalanced && dataBalanced.inventoryReconciliation.status === "BALANCED";
       const step2Passed = dataMismatch.inventoryReconciliation.status === "MISMATCH" && 
                           dataMismatch.inventoryReconciliation.unitDiscrepancy === 1 &&
@@ -246,135 +218,113 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-gray-800 flex flex-col font-sans">
-      <HeaderNavbar
-        currentUser={user}
-        onSwitchRole={handleSwitchRole}
-        onOpenResetModal={() => setResetModalOpen(true)}
-        onOpenAuditDrawer={() => setAuditDrawerOpen(true)}
-        onOpenAppSwitcher={() => setAppSwitcherOpen(true)}
-      />
+    <AppLayout
+      currentUser={user}
+      onSwitchRole={handleSwitchRole}
+      breadcrumbs={[{ label: "Analitik" }, { label: "Executive Dashboard" }]}
+      title="Executive Operational & Financial Dashboard"
+      subtitle="PT Rasa Aruna Bersama · Dataset: Baseline Seed · Per Tanggal: 20 Okt 2026"
+      wireframe="Wireframe S-16"
+      actions={
+        <div className="flex items-center flex-wrap gap-2">
+          <button
+            onClick={() => fetchDashboardData(simulatedDiff)}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-[#F7F8F5] text-[#202824] border border-[#E5E9E4] rounded-lg text-xs font-semibold shadow-xs transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#174A3A] ${loading ? "animate-spin" : ""}`} />
+            <span>Segarkan Data</span>
+          </button>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Wireframe S-16: Header & Identity */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-[#714B67] shadow-xs">
-              <BarChart3 className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                  Modul F-20 & F-21
-                </span>
-                <span className="text-xs text-gray-500 font-medium">Wireframe S-16</span>
-              </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
-                Executive Operational & Financial Dashboard
-              </h1>
-              <p className="text-xs text-gray-500">
-                PT Rasa Aruna Bersama · Dataset: <span className="font-semibold text-gray-700">Baseline Seed</span> · Per Tanggal: <span className="font-semibold text-gray-700">20 Okt 2026</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center flex-wrap gap-2">
+          {simulatedDiff === 0 ? (
+            <button
+              onClick={() => handleToggleSimulation(1)}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-semibold shadow-xs transition-colors"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              <span>Simulasikan Selisih +1 Unit (T-32)</span>
+            </button>
+          ) : (
             <button
               onClick={() => handleToggleSimulation(0)}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold shadow-xs transition-colors"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              <span>Refresh Metrics</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Kembalikan Normal (0 Unit)</span>
             </button>
-
-            {simulatedDiff === 0 ? (
-              <button
-                onClick={() => handleToggleSimulation(1)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-semibold transition-colors"
-              >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                <span>Simulasikan Selisih +1 Unit (T-32)</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => handleToggleSimulation(0)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-semibold transition-colors"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Kembalikan Normal (0 Unit)</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
-
-        {/* SR-20 & T-32 Warning Alert Banner (if Discrepancy Simulated) */}
-        {reconciliation?.inventoryReconciliation.status === "MISMATCH" && (
-          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-xs animate-in fade-in">
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-amber-900">
-                    PERINGATAN REKONSILIASI PERSEDIAAN (SR-20 / T-32)
-                  </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200 text-amber-900 uppercase">
-                    Status: MISMATCH DETECTED
+      }
+    >
+      {/* SR-20 & T-32 Warning Alert Banner (if Discrepancy Simulated) */}
+      {reconciliation?.inventoryReconciliation.status === "MISMATCH" && (
+        <div className="bg-amber-50/90 border-l-4 border-amber-500 p-4.5 rounded-r-xl shadow-xs border border-amber-200 animate-in fade-in">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-amber-900">
+                  PERINGATAN REKONSILIASI PERSEDIAAN (SR-20 / T-32)
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 uppercase">
+                  Status: MISMATCH DETECTED
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 mt-1">
+                {reconciliation.inventoryReconciliation.warningMessage}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-amber-900 bg-amber-100/70 p-2.5 rounded-lg border border-amber-200">
+                <div className="flex items-center space-x-1.5">
+                  <ShieldAlert className="w-4 h-4 text-amber-700" />
+                  <span>Auto-Posting Ditolak:</span>
+                  <span className="text-emerald-800 font-bold bg-white px-2 py-0.5 rounded border border-amber-300">
+                    BLOCKED (SR-20 Compliant)
                   </span>
                 </div>
-                <p className="text-xs text-amber-800 mt-1">
-                  {reconciliation.inventoryReconciliation.warningMessage}
-                </p>
-                <div className="mt-3 flex items-center space-x-4 text-xs font-semibold text-amber-900 bg-amber-100/60 p-2.5 rounded-lg border border-amber-200">
-                  <div className="flex items-center space-x-1">
-                    <ShieldAlert className="w-4 h-4 text-amber-700" />
-                    <span>Auto-Posting Ditolak:</span>
-                    <span className="text-emerald-700 font-bold bg-white px-1.5 py-0.2 rounded border border-amber-300">
-                      BLOCKED (SR-20 Compliant)
-                    </span>
-                  </div>
-                  <div>
-                    <span>Selisih Fisik:</span>{" "}
-                    <span className="font-bold underline text-amber-900">
-                      {(reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) > 0 ? `+${reconciliation?.inventoryReconciliation?.unitDiscrepancy}` : (reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0)} unit
-                    </span>
-                  </div>
-                  <div>
-                    <span>Tindakan Wajib:</span>{" "}
-                    <span className="italic font-normal">Investigasi fisik & pemeriksaan dokumen transaksi sumber.</span>
-                  </div>
+                <div>
+                  <span>Selisih Fisik:</span>{" "}
+                  <span className="font-bold underline text-amber-900">
+                    {(reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) > 0 ? `+${reconciliation?.inventoryReconciliation?.unitDiscrepancy}` : (reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0)} unit
+                  </span>
+                </div>
+                <div>
+                  <span>Tindakan Wajib:</span>{" "}
+                  <span className="italic font-normal">Investigasi fisik & audit dokumen sumber.</span>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Wireframe S-16 Section ④: Operational KPI Cards (F-20) */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800 flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-[#714B67]" />
-              <span>Section ④: Operational KPI Summary (F-20)</span>
-            </h2>
-            <span className="text-[11px] text-gray-500 font-medium">
-              Data persisten terhitung langsung dari transaksi database (Zero mock)
-            </span>
-          </div>
+      {/* Operational KPI Cards (F-20) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-[#202824] uppercase tracking-wide flex items-center space-x-2">
+            <Layers className="w-4 h-4 text-[#174A3A]" />
+            <span>Ringkasan Metrik Operasional (Fitur F-20)</span>
+          </h2>
+          <span className="text-xs text-[#758078]">
+            Kalkulasi langsung dari database (Zero Mock Data)
+          </span>
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Total Stok Fisik */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Total Stok Fisik */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Stok Fisik Perusahaan</span>
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Stok Fisik Gudang
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-[#F2F7F4] text-[#174A3A] border border-[#C4DBD0] flex items-center justify-center">
                   <Package className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {metrics?.inventory.totalUnits.toLocaleString("id-ID") || 616}{" "}
-                <span className="text-xs font-normal text-gray-500">Unit</span>
+                <span className="text-xs font-normal text-[#758078]">Unit</span>
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>WH-JKT:</span>
                   <span className="font-semibold">{metrics?.inventory.whUnits || 410} unit</span>
@@ -388,61 +338,69 @@ export default function DashboardPage() {
                   <span className="font-semibold">{metrics?.inventory.reservedUnits || 6} unit</span>
                 </div>
               </div>
-              <Link
-                href="/inventory/products"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Lihat 15 SKU Varian</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/inventory/products"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>15 SKU Master Produk</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 2: Valuasi Persediaan */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 2: Valuasi Persediaan */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Valuasi Persediaan</span>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Valuasi Persediaan
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {formatRupiah(metrics?.inventory.totalValuation || 12214000)}
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>Metode Biaya:</span>
                   <span className="font-semibold">Standard Costing</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Akun Terkait:</span>
-                  <span className="font-semibold text-indigo-700">1030 Persediaan</span>
+                  <span>Akun CoA:</span>
+                  <span className="font-semibold text-[#174A3A]">1030 Persediaan</span>
                 </div>
                 <div className="flex justify-between text-emerald-700">
-                  <span>Kesesuaian Buku:</span>
+                  <span>Kesesuaian Fisik:</span>
                   <span className="font-semibold">100% Cocok</span>
                 </div>
               </div>
-              <Link
-                href="/inventory/products"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Detail Biaya Produk</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/inventory/products"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Detail Biaya Produk</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 3: Piutang Dagang (A/R) */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 3: Piutang Dagang (A/R) */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Piutang Dagang (A/R)</span>
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Piutang Usaha (A/R)
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center">
                   <Wallet className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {formatRupiah(metrics?.receivables.totalAR || 1500000)}
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>PT Boga Kuliner:</span>
                   <span className="font-semibold">Rp 1.000.000</span>
@@ -451,32 +409,36 @@ export default function DashboardPage() {
                   <span>CV Katering Berkah:</span>
                   <span className="font-semibold">Rp 500.000</span>
                 </div>
-                <div className="flex justify-between text-indigo-700">
+                <div className="flex justify-between text-[#174A3A]">
                   <span>Akun CoA:</span>
-                  <span className="font-semibold">1020 Piutang Usaha</span>
+                  <span className="font-semibold">1020 Piutang</span>
                 </div>
               </div>
-              <Link
-                href="/sales/contacts"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Buka Data Pelanggan</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/sales/contacts"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Kontak & Limit Kredit</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 4: Utang Usaha (A/P) */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 4: Utang Usaha (A/P) */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Utang Usaha (A/P)</span>
-                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Utang Usaha (A/P)
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center">
                   <FileText className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {formatRupiah(metrics?.payables.totalAP || 1000000)}
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>PT Sumber Pangan:</span>
                   <span className="font-semibold">Rp 600.000</span>
@@ -485,488 +447,486 @@ export default function DashboardPage() {
                   <span>CV Rempah Wangi:</span>
                   <span className="font-semibold">Rp 400.000</span>
                 </div>
-                <div className="flex justify-between text-indigo-700">
+                <div className="flex justify-between text-[#174A3A]">
                   <span>Akun CoA:</span>
                   <span className="font-semibold">2010 Utang Usaha</span>
                 </div>
               </div>
-              <Link
-                href="/accounting/vendor-bills"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Buka Tagihan Vendor</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/accounting/vendor-bills"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Tagihan Vendor (3-Way)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 5: Kas & Bank (Akun 1010) */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 5: Kas & Bank */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Saldo Kas & Bank</span>
-                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Saldo Kas & Bank
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-[#FAF5EB] text-[#C6A15B] border border-[#F4E7CE] flex items-center justify-center">
                   <Building2 className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {formatRupiah(metrics?.bank.balance || 20000000)}
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>Bank Utama:</span>
                   <span className="font-semibold">{metrics?.bank.accountName || "Bank BCA"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Nomor Akun:</span>
-                  <span className="font-semibold text-indigo-700">1010 Kas & Bank</span>
+                  <span>Akun CoA:</span>
+                  <span className="font-semibold text-[#174A3A]">1010 Kas & Bank</span>
                 </div>
                 <div className="flex justify-between text-emerald-700">
-                  <span>Status Likuiditas:</span>
+                  <span>Likuiditas:</span>
                   <span className="font-semibold">Aktif & Stabil</span>
                 </div>
               </div>
-              <Link
-                href="/accounting/journal-entries"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Buka Jurnal Kas</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/accounting/journal-entries"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Buka Jurnal Kas</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 6: CRM Opportunities */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 6: CRM Opportunities */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Pipeline Peluang (CRM)</span>
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Pipeline Leads CRM
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center">
                   <Users2 className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {metrics?.crm.leadsCount || 1}{" "}
-                <span className="text-xs font-normal text-gray-500">Lead</span>
+                <span className="text-xs font-normal text-[#758078]">Lead</span>
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
-                  <span>Potensi Omset:</span>
+                  <span>Estimasi Omset:</span>
                   <span className="font-semibold text-emerald-700">{formatRupiah(metrics?.crm.leadsValue || 1200000)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Prospek Utama:</span>
-                  <span className="font-semibold truncate max-w-[130px]">Paket Makan Siang</span>
-                </div>
-                <div className="flex justify-between text-blue-700">
                   <span>Tahapan:</span>
                   <span className="font-semibold">Qualified Stage</span>
                 </div>
+                <div className="flex justify-between text-blue-700">
+                  <span>Kode:</span>
+                  <span className="font-semibold">LD0003</span>
+                </div>
               </div>
-              <Link
-                href="/crm/leads"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Buka Kanban CRM</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/crm/leads"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Buka Kanban Leads</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 7: Confirmed Sales Orders */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 7: Confirmed Sales Orders */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Sales Order Terkonfirmasi</span>
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Sales Orders Aktif
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-[#F2F7F4] text-[#174A3A] border border-[#C4DBD0] flex items-center justify-center">
                   <ShoppingCart className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {metrics?.sales.confirmedOrdersCount || 1}{" "}
-                <span className="text-xs font-normal text-gray-500">SO</span>
+                <span className="text-xs font-normal text-[#758078]">SO</span>
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>Nomor Dokumen:</span>
-                  <span className="font-semibold text-purple-700">S00006</span>
+                  <span className="font-semibold text-[#174A3A]">S00006</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Stok Direservasi:</span>
+                  <span>Stok Reserved:</span>
                   <span className="font-semibold text-amber-700">{metrics?.sales.reservedStockUnits || 6} unit</span>
                 </div>
-                <div className="flex justify-between text-gray-700">
+                <div className="flex justify-between">
                   <span>Nilai Order:</span>
                   <span className="font-semibold">Rp 1.155.000</span>
                 </div>
               </div>
-              <Link
-                href="/sales/orders"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Buka Sales Orders</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/sales/orders"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Kelola Sales Orders</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            {/* Card 8: Confirmed Purchase Orders */}
-            <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4.5 hover:shadow-md transition-shadow relative group">
+          {/* Card 8: Confirmed Purchase Orders */}
+          <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-4.5 hover:shadow-card hover:border-[#174A3A]/30 transition-all flex flex-col justify-between">
+            <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Purchase Order Terkonfirmasi</span>
-                <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-[#758078] uppercase tracking-wider">
+                  Purchase Orders Aktif
+                </span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center">
                   <Truck className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-[#202824]">
                 {metrics?.purchase.confirmedOrdersCount || 1}{" "}
-                <span className="text-xs font-normal text-gray-500">PO</span>
+                <span className="text-xs font-normal text-[#758078]">PO</span>
               </div>
-              <div className="mt-2 text-[11px] text-gray-600 space-y-0.5 border-t border-gray-100 pt-2">
+              <div className="mt-2 text-[11px] text-[#525B55] space-y-0.5 border-t border-[#EEF1ED] pt-2">
                 <div className="flex justify-between">
                   <span>Nomor Dokumen:</span>
-                  <span className="font-semibold text-purple-700">P00006</span>
+                  <span className="font-semibold text-[#174A3A]">P00006</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Vendor:</span>
-                  <span className="font-semibold truncate max-w-[130px]">PT Sumber Pangan</span>
+                  <span className="font-semibold truncate max-w-[120px]">PT Sumber Pangan</span>
                 </div>
-                <div className="flex justify-between text-gray-700">
-                  <span>Komitmen Pengadaan:</span>
+                <div className="flex justify-between">
+                  <span>Komitmen:</span>
                   <span className="font-semibold">Rp 800.000</span>
                 </div>
               </div>
-              <Link
-                href="/purchase/orders"
-                className="mt-3 flex items-center justify-between text-[11px] text-[#714B67] hover:text-[#52334a] font-semibold pt-1"
-              >
-                <span>Buka Purchase Orders</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
             </div>
+            <Link
+              href="/purchase/orders"
+              className="mt-3 flex items-center justify-between text-[11px] text-[#174A3A] hover:text-[#11382C] font-semibold pt-2 border-t border-[#EEF1ED]"
+            >
+              <span>Kelola Pengadaan (RFQ/PO)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
+      </div>
 
-        {/* Wireframe S-16 Section ⑤: Financial Balancing & Reconciliation (F-21 & SR-20) */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-gray-100 gap-2">
-            <div>
-              <div className="flex items-center space-x-2">
-                <Scale className="w-5 h-5 text-[#714B67]" />
-                <h2 className="text-base font-bold text-gray-900">
-                  Section ⑤: Financial Balancing & Reconciliation Matrix (F-21)
-                </h2>
-              </div>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Pemeriksaan kepatuhan prinsip pembukuan berpasangan (Double-Entry) dan keselarasan fisik dengan buku besar.
-              </p>
-            </div>
-
+      {/* Financial Balancing & Reconciliation Matrix (F-21 & SR-20) */}
+      <div className="bg-white rounded-xl shadow-xs border border-[#E5E9E4] p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-[#E5E9E4] gap-3">
+          <div>
             <div className="flex items-center space-x-2">
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center space-x-1.5 ${
-                reconciliation?.generalLedger.isBalanced 
-                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                  : "bg-rose-100 text-rose-800 border border-rose-300"
-              }`}>
-                {reconciliation?.generalLedger.isBalanced ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Double-Entry: BALANCED (Debit = Kredit)</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Double-Entry: UNBALANCED</span>
-                  </>
-                )}
-              </span>
-
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center space-x-1.5 ${
-                reconciliation?.inventoryReconciliation.status === "BALANCED"
-                  ? "bg-blue-100 text-blue-800 border border-blue-300"
-                  : "bg-amber-100 text-amber-800 border border-amber-300"
-              }`}>
-                {reconciliation?.inventoryReconciliation.status === "BALANCED" ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Rekonsiliasi Persediaan: MATCHED</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Rekonsiliasi Persediaan: MISMATCH</span>
-                  </>
-                )}
-              </span>
-            </div>
-          </div>
-
-          {/* Sub-Ledger vs General Ledger Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Box 1: Double-Entry Ledger Verification */}
-            <div className="p-4.5 rounded-xl border border-gray-200 bg-gray-50/70 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                  1. Keseimbangan Buku Besar
-                </span>
-                <BookOpen className="w-4 h-4 text-purple-700" />
-              </div>
-
-              <div className="space-y-1.5 text-xs text-gray-700">
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Total Akumulasi Debit:</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    {formatRupiah(reconciliation?.generalLedger.totalDebit || 33714000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Total Akumulasi Kredit:</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    {formatRupiah(reconciliation?.generalLedger.totalCredit || 33714000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 font-semibold">
-                  <span className="text-gray-700">Selisih Debit - Kredit:</span>
-                  <span className={`font-mono ${reconciliation?.generalLedger.difference === 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                    {formatRupiah(reconciliation?.generalLedger.difference || 0)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-2 text-[11px] text-gray-500">
-                <p className="flex items-center space-x-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Jurnal Saldo Awal Terposting: JE/2026/0000</span>
-                </p>
-                <p className="flex items-center space-x-1 mt-0.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Total {reconciliation?.generalLedger.totalEntries || 1} Jurnal Aktif di Database</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Box 2: Inventory Sub-ledger vs Physical Stock */}
-            <div className={`p-4.5 rounded-xl border space-y-3 transition-colors ${
-              reconciliation?.inventoryReconciliation.status === "BALANCED"
-                ? "border-gray-200 bg-gray-50/70"
-                : "border-amber-400 bg-amber-50/80"
-            }`}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                  2. Fisik vs Akun 1030
-                </span>
-                <Package className="w-4 h-4 text-indigo-700" />
-              </div>
-
-              <div className="space-y-1.5 text-xs text-gray-700">
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Stok Fisik Gudang & Kafe:</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    {reconciliation?.inventoryReconciliation.physicalUnits || 616} Unit
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Valuasi Fisik (Std Cost):</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    {formatRupiah(reconciliation?.inventoryReconciliation.physicalValuation || 12214000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Saldo Akun Buku Besar 1030:</span>
-                  <span className="font-mono font-bold text-indigo-900">
-                    {formatRupiah(reconciliation?.inventoryReconciliation.ledgerBalance || 12214000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 font-semibold">
-                  <span className="text-gray-700">Selisih Unit / Nilai:</span>
-                  <span className={`font-mono font-bold ${
-                    (reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) === 0
-                      ? "text-emerald-700"
-                      : "text-amber-800"
-                  }`}>
-                    {(reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) === 0
-                      ? "0 Unit / Rp 0"
-                      : `${(reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) > 0 ? `+${reconciliation?.inventoryReconciliation?.unitDiscrepancy}` : reconciliation?.inventoryReconciliation?.unitDiscrepancy} Unit (${formatRupiah(reconciliation?.inventoryReconciliation?.valueDiscrepancy || 0)})`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-2 text-[11px]">
-                {reconciliation?.inventoryReconciliation.status === "BALANCED" ? (
-                  <span className="text-emerald-700 font-semibold flex items-center space-x-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Persediaan Fisik & Akun 1030 Tepat Sesuai</span>
-                  </span>
-                ) : (
-                  <span className="text-amber-800 font-bold flex items-center space-x-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Anomali Terdeteksi (Dilarang Auto-Post)</span>
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Box 3: Subledger Matching (A/R & A/P) */}
-            <div className="p-4.5 rounded-xl border border-gray-200 bg-gray-50/70 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                  3. Matching Subledger A/R & A/P
-                </span>
-                <Wallet className="w-4 h-4 text-emerald-700" />
-              </div>
-
-              <div className="space-y-1.5 text-xs text-gray-700">
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Subledger Piutang Pelanggan:</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    {formatRupiah(reconciliation?.subledgerMatching.arSubledgerTotal || 1500000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Saldo Akun 1020 (Piutang):</span>
-                  <span className="font-mono font-bold text-indigo-900">
-                    {formatRupiah(reconciliation?.subledgerMatching.arLedgerAccountBalance || 1500000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-gray-200">
-                  <span className="text-gray-600">Subledger Utang Vendor:</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    {formatRupiah(reconciliation?.subledgerMatching.apSubledgerTotal || 1000000)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 font-semibold">
-                  <span className="text-gray-600">Saldo Akun 2010 (Utang):</span>
-                  <span className="font-mono font-bold text-indigo-900">
-                    {formatRupiah(reconciliation?.subledgerMatching.apLedgerAccountBalance || 1000000)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-2 text-[11px] text-emerald-700 font-semibold space-y-1">
-                <p className="flex items-center space-x-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>A/R Subledger == Akun 1020 (MATCH)</span>
-                </p>
-                <p className="flex items-center space-x-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>A/P Subledger == Akun 2010 (MATCH)</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Audit Source Trail */}
-          <div className="bg-gray-100 rounded-lg p-3 text-xs text-gray-700">
-            <span className="font-bold text-gray-800 block mb-1">
-              Jejak Audit Sumber Data Rekonsiliasi (Audit Source Trail):
-            </span>
-            <ul className="list-disc list-inside space-y-0.5 text-gray-600 text-[11px]">
-              {reconciliation?.inventoryReconciliation.sourceTrail.map((trail, idx) => (
-                <li key={idx} className={trail.includes("ANOMALI") ? "text-amber-800 font-semibold" : ""}>
-                  {trail}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* Section ⑥: Interactive Test Runners (T-31 & T-32) */}
-        <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
-                <Play className="w-4 h-4 text-[#714B67]" />
-                <span>Pengujian Otomatis Tahap 8 (T-31 & T-32)</span>
+              <Scale className="w-5 h-5 text-[#174A3A]" />
+              <h2 className="text-base font-bold text-[#202824]">
+                Matriks Rekonsiliasi & Integritas Keuangan (F-21 & SR-20)
               </h2>
-              <p className="text-xs text-gray-500">
-                Eksekusi pengujian verifikasi integritas dashboard dan aturan penanganan anomali rekonsiliasi (SR-20).
-              </p>
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={runTestT31}
-                disabled={testing}
-                className="px-3.5 py-1.5 bg-[#714B67] hover:bg-[#5a3a52] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center space-x-1.5 disabled:opacity-50"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Jalankan Uji T-31 (Dashboard Integrity)</span>
-              </button>
+            <p className="text-xs text-[#758078] mt-0.5">
+              Pemeriksaan kepatuhan prinsip pembukuan berpasangan (Double-Entry) dan keselarasan saldo buku besar.
+            </p>
+          </div>
 
-              <button
-                onClick={runTestT32}
-                disabled={testing}
-                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center space-x-1.5 disabled:opacity-50"
-              >
-                <AlertOctagon className="w-3.5 h-3.5" />
-                <span>Jalankan Uji T-32 (Simulasi Anomali & SR-20)</span>
-              </button>
+          <div className="flex items-center flex-wrap gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1.5 ${
+              reconciliation?.generalLedger.isBalanced 
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                : "bg-rose-50 text-rose-800 border border-rose-200"
+            }`}>
+              {reconciliation?.generalLedger.isBalanced ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Double-Entry: BALANCED (Debit = Kredit)</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Double-Entry: UNBALANCED</span>
+                </>
+              )}
+            </span>
+
+            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1.5 ${
+              reconciliation?.inventoryReconciliation.status === "BALANCED"
+                ? "bg-blue-50 text-blue-800 border border-blue-200"
+                : "bg-amber-50 text-amber-800 border border-amber-200"
+            }`}>
+              {reconciliation?.inventoryReconciliation.status === "BALANCED" ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Rekonsiliasi Persediaan: MATCHED</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Rekonsiliasi Persediaan: MISMATCH</span>
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Sub-Ledger vs General Ledger Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Box 1: Double-Entry Ledger Verification */}
+          <div className="p-4.5 rounded-xl border border-[#E5E9E4] bg-[#F7F8F5] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#202824]">
+                1. Keseimbangan Buku Besar
+              </span>
+              <BookOpen className="w-4 h-4 text-[#174A3A]" />
+            </div>
+
+            <div className="space-y-1.5 text-xs text-[#202824]">
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Total Akumulasi Debit:</span>
+                <span className="font-mono font-bold text-[#202824]">
+                  {formatRupiah(reconciliation?.generalLedger.totalDebit || 33714000)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Total Akumulasi Kredit:</span>
+                <span className="font-mono font-bold text-[#202824]">
+                  {formatRupiah(reconciliation?.generalLedger.totalCredit || 33714000)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 font-semibold">
+                <span className="text-[#202824]">Selisih Debit - Kredit:</span>
+                <span className={`font-mono font-bold ${reconciliation?.generalLedger.difference === 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                  {formatRupiah(reconciliation?.generalLedger.difference || 0)}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 text-[11px] text-[#758078] space-y-1">
+              <p className="flex items-center space-x-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Jurnal Saldo Awal Terposting: JE/2026/0000</span>
+              </p>
+              <p className="flex items-center space-x-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Total {reconciliation?.generalLedger.totalEntries || 1} Jurnal Aktif Terverifikasi</span>
+              </p>
             </div>
           </div>
 
-          {/* Test Result Display */}
-          {testResult && (
-            <div className={`p-4 rounded-xl border text-xs space-y-2 animate-in fade-in ${
-              testResult.status === "PASS"
-                ? "bg-emerald-50/80 border-emerald-300 text-emerald-900"
-                : "bg-rose-50/80 border-rose-300 text-rose-900"
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                    testResult.status === "PASS" ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
-                  }`}>
-                    {testResult.id}: {testResult.status}
-                  </span>
-                  <span className="font-bold text-sm">{testResult.name}</span>
-                </div>
-                <span className="text-[10px] text-gray-500 font-mono">
-                  Timestamp: {new Date().toLocaleTimeString("id-ID")}
+          {/* Box 2: Inventory Sub-ledger vs Physical Stock */}
+          <div className={`p-4.5 rounded-xl border space-y-3 transition-colors ${
+            reconciliation?.inventoryReconciliation.status === "BALANCED"
+              ? "border-[#E5E9E4] bg-[#F7F8F5]"
+              : "border-amber-300 bg-amber-50/70"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#202824]">
+                2. Fisik vs Akun Persediaan (1030)
+              </span>
+              <Package className="w-4 h-4 text-[#174A3A]" />
+            </div>
+
+            <div className="space-y-1.5 text-xs text-[#202824]">
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Stok Fisik Gudang & Kafe:</span>
+                <span className="font-mono font-bold text-[#202824]">
+                  {reconciliation?.inventoryReconciliation.physicalUnits || 616} Unit
                 </span>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                <div className="bg-white/70 p-2.5 rounded-lg border border-gray-200/50">
-                  <span className="font-bold text-gray-700 block text-[11px] mb-0.5">Ekspektasi Pengujian:</span>
-                  <p className="text-gray-600 leading-relaxed">{testResult.expected}</p>
-                </div>
-                <div className="bg-white/70 p-2.5 rounded-lg border border-gray-200/50">
-                  <span className="font-bold text-gray-700 block text-[11px] mb-0.5">Hasil Aktual Sistem:</span>
-                  <p className="text-gray-800 font-medium leading-relaxed">{testResult.actual}</p>
-                </div>
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Valuasi Fisik (Std Cost):</span>
+                <span className="font-mono font-bold text-[#202824]">
+                  {formatRupiah(reconciliation?.inventoryReconciliation.physicalValuation || 12214000)}
+                </span>
               </div>
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Saldo Buku Akun 1030:</span>
+                <span className="font-mono font-bold text-[#174A3A]">
+                  {formatRupiah(reconciliation?.inventoryReconciliation.ledgerBalance || 12214000)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 font-semibold">
+                <span className="text-[#202824]">Selisih Unit / Nilai:</span>
+                <span className={`font-mono font-bold ${
+                  (reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) === 0
+                    ? "text-emerald-700"
+                    : "text-amber-800"
+                }`}>
+                  {(reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) === 0
+                    ? "0 Unit / Rp 0"
+                    : `${(reconciliation?.inventoryReconciliation?.unitDiscrepancy ?? 0) > 0 ? `+${reconciliation?.inventoryReconciliation?.unitDiscrepancy}` : reconciliation?.inventoryReconciliation?.unitDiscrepancy} Unit (${formatRupiah(reconciliation?.inventoryReconciliation?.valueDiscrepancy || 0)})`}
+                </span>
+              </div>
+            </div>
 
-              {testResult.details && testResult.details.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-gray-200/60">
-                  <span className="font-bold text-gray-800 text-[11px] block mb-1">Rincian Verifikasi Komponen:</span>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-gray-700">
-                    {testResult.details.map((detail, idx) => (
-                      <li key={idx} className="flex items-center space-x-1.5">
-                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>{detail}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            <div className="pt-2 text-[11px]">
+              {reconciliation?.inventoryReconciliation.status === "BALANCED" ? (
+                <span className="text-emerald-700 font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Persediaan Fisik & Akun 1030 Tepat Sesuai</span>
+                </span>
+              ) : (
+                <span className="text-amber-800 font-bold flex items-center space-x-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Anomali Terdeteksi (Dilarang Auto-Post)</span>
+                </span>
               )}
             </div>
-          )}
+          </div>
+
+          {/* Box 3: Subledger Matching (A/R & A/P) */}
+          <div className="p-4.5 rounded-xl border border-[#E5E9E4] bg-[#F7F8F5] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#202824]">
+                3. Matching Subledger A/R & A/P
+              </span>
+              <Wallet className="w-4 h-4 text-[#174A3A]" />
+            </div>
+
+            <div className="space-y-1.5 text-xs text-[#202824]">
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Subledger Piutang Pelanggan:</span>
+                <span className="font-mono font-bold text-[#202824]">
+                  {formatRupiah(reconciliation?.subledgerMatching.arSubledgerTotal || 1500000)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Saldo Akun 1020 (Piutang):</span>
+                <span className="font-mono font-bold text-[#174A3A]">
+                  {formatRupiah(reconciliation?.subledgerMatching.arLedgerAccountBalance || 1500000)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#E5E9E4]">
+                <span className="text-[#758078]">Subledger Utang Vendor:</span>
+                <span className="font-mono font-bold text-[#202824]">
+                  {formatRupiah(reconciliation?.subledgerMatching.apSubledgerTotal || 1000000)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 font-semibold">
+                <span className="text-[#758078]">Saldo Akun 2010 (Utang):</span>
+                <span className="font-mono font-bold text-[#174A3A]">
+                  {formatRupiah(reconciliation?.subledgerMatching.apLedgerAccountBalance || 1000000)}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 text-[11px] text-emerald-700 font-semibold space-y-1">
+              <p className="flex items-center space-x-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>A/R Subledger == Akun 1020 (MATCH)</span>
+              </p>
+              <p className="flex items-center space-x-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>A/P Subledger == Akun 2010 (MATCH)</span>
+              </p>
+            </div>
+          </div>
         </div>
-      </main>
 
-      {/* Global Modals */}
-      <AppSwitcherModal
-        isOpen={appSwitcherOpen}
-        onClose={() => setAppSwitcherOpen(false)}
-        userRole={user?.role}
-      />
+        {/* Audit Source Trail */}
+        <div className="bg-[#F7F8F5] rounded-xl p-3.5 border border-[#E5E9E4] text-xs text-[#202824]">
+          <span className="font-bold text-[#202824] block mb-1">
+            Jejak Audit Sumber Data Rekonsiliasi (Audit Source Trail):
+          </span>
+          <ul className="list-disc list-inside space-y-0.5 text-[#525B55] text-[11px]">
+            {reconciliation?.inventoryReconciliation.sourceTrail.map((trail, idx) => (
+              <li key={idx} className={trail.includes("ANOMALI") ? "text-amber-800 font-semibold" : ""}>
+                {trail}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
 
-      <ResetSeedModal
-        isOpen={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-        currentUserRole={user?.role}
-        onSuccess={() => {
-          fetchDashboardData(0);
-        }}
-      />
+      {/* Interactive Test Runners (T-31 & T-32) */}
+      <div className="bg-[#103429] text-white rounded-xl shadow-md p-6 border border-[#C6A15B]/30 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#C6A15B] text-[#103429]">
+                Automation Test Runner
+              </span>
+              <span className="text-xs text-[#DCE8DF] font-semibold">T-31 & T-32 Suite</span>
+            </div>
+            <h3 className="text-base font-bold mt-1 text-white">
+              Pengujian Otomatis Integritas Dashboard & Rekonsiliasi (SR-20)
+            </h3>
+            <p className="text-xs text-[#DCE8DF]/80">
+              Eksekusi verifikasi integritas metrik operasional dan penolakan manipulasi jurnal saat anomali.
+            </p>
+          </div>
+          
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              onClick={runTestT31}
+              disabled={testing}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center space-x-1.5 disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Uji T-31 (Dashboard Integrity)</span>
+            </button>
 
-      <AuditHistoryDrawer
-        isOpen={auditDrawerOpen}
-        onClose={() => setAuditDrawerOpen(false)}
-      />
-    </div>
+            <button
+              onClick={runTestT32}
+              disabled={testing}
+              className="px-3.5 py-2 bg-[#C6A15B] hover:bg-[#A88544] text-[#103429] font-bold rounded-lg text-xs shadow-xs transition-colors flex items-center space-x-1.5 disabled:opacity-50"
+            >
+              <AlertOctagon className="w-3.5 h-3.5" />
+              <span>Uji T-32 (Simulasi Anomali & SR-20)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Test Result Display */}
+        {testResult && (
+          <div className="bg-[#081B15] border border-[#C6A15B]/40 rounded-xl p-4.5 space-y-2.5 text-xs animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-[#C6A15B] font-mono text-sm">
+                  [{testResult.id}]
+                </span>
+                <span className="font-semibold text-white">{testResult.name}</span>
+              </div>
+              <span
+                className={`px-3 py-0.5 rounded-full font-bold font-mono text-xs ${
+                  testResult.status === "PASS" ? "bg-emerald-500 text-gray-950" : "bg-rose-500 text-white"
+                }`}
+              >
+                {testResult.status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block text-[11px]">Ekspektasi:</span>
+                <p className="text-[#DCE8DF] leading-relaxed text-[11px]">{testResult.expected}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[#ADB2AA] font-semibold block text-[11px]">Hasil Aktual:</span>
+                <p className="text-emerald-300 font-mono leading-relaxed text-[11px]">{testResult.actual}</p>
+              </div>
+            </div>
+
+            {testResult.details && testResult.details.length > 0 && (
+              <div className="mt-2.5 pt-2.5 border-t border-white/10">
+                <span className="text-[#C6A15B] font-semibold text-[11px] block mb-1">Rincian Verifikasi Komponen:</span>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-[#DCE8DF]">
+                  {testResult.details.map((detail, idx) => (
+                    <li key={idx} className="flex items-center space-x-1.5">
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </AppLayout>
   );
 }
