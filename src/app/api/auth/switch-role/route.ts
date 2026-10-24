@@ -6,23 +6,31 @@ import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
   try {
-    const { role } = await request.json();
+    const { role, userId } = await request.json();
     const prevUser = await getCurrentUser();
 
-    if (!role || !Object.values(Role).includes(role as Role)) {
-      return NextResponse.json(
-        { error: "Role tidak valid." },
-        { status: 400 }
-      );
+    let targetUser = null;
+    if (userId) {
+      targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+      });
     }
 
-    const targetUser = await prisma.user.findFirst({
-      where: { role: role as Role },
-    });
+    if (!targetUser && role) {
+      if (!Object.values(Role).includes(role as Role)) {
+        return NextResponse.json(
+          { error: "Role tidak valid." },
+          { status: 400 }
+        );
+      }
+      targetUser = await prisma.user.findFirst({
+        where: { role: role as Role },
+      });
+    }
 
     if (!targetUser) {
       return NextResponse.json(
-        { error: `User dengan role ${role} tidak ditemukan.` },
+        { error: `User tidak ditemukan.` },
         { status: 404 }
       );
     }

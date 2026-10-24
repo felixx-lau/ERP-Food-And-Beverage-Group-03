@@ -15,7 +15,7 @@ interface AppLayoutProps {
     email: string;
     role: string;
   } | null;
-  onSwitchRole?: (role: string) => Promise<void>;
+  onSwitchRole?: (role: string, userId?: string) => Promise<void>;
   breadcrumbs?: Array<{ label: string; href?: string }>;
   title?: string;
   subtitle?: string;
@@ -65,9 +65,9 @@ export default function AppLayout({
     }
   }, []);
 
-  const handleSwitchRole = async (targetRole: string) => {
+  const handleSwitchRole = async (targetRole: string, userId?: string) => {
     if (initialSwitchRole) {
-      await initialSwitchRole(targetRole);
+      await initialSwitchRole(targetRole, userId);
       return;
     }
 
@@ -75,11 +75,12 @@ export default function AppLayout({
       const res = await fetch("/api/auth/switch-role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: targetRole }),
+        body: JSON.stringify({ role: targetRole, userId }),
       });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        window.location.reload();
       }
     } catch (err) {
       console.error("Role switch error:", err);

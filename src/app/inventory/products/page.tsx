@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import StatusBadge from "@/components/StatusBadge";
 import KPICard from "@/components/KPICard";
-import { Package, Play, Layers, Building, RefreshCw, MapPin, Tag } from "lucide-react";
+import CreateProductModal from "@/components/CreateProductModal";
+import { Package, Play, Layers, Building, RefreshCw, MapPin, Tag, Plus } from "lucide-react";
 import Link from "next/link";
 
 export default function ProductsPage() {
@@ -13,6 +14,7 @@ export default function ProductsPage() {
   const [selectedSku, setSelectedSku] = useState<string>("RICE-CHICK-S");
   const [productDetail, setProductDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Test Runner state
   const [testResult, setTestResult] = useState<any>(null);
@@ -165,6 +167,13 @@ export default function ProductsPage() {
       wireframe="Wireframe S-05"
       actions={
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold bg-[#174A3A] hover:bg-[#134032] active:bg-[#0f3328] text-white rounded-lg shadow-xs transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ Produk Baru</span>
+          </button>
           <span className="text-xs font-semibold text-[#758078] hidden sm:inline">Pilih Varian SKU:</span>
           <select
             value={selectedSku}
@@ -348,6 +357,15 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Tambah Produk Baru */}
+      <CreateProductModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onProductCreated={() => {
+          fetchProducts();
+        }}
+      />
     </AppLayout>
   );
 }
